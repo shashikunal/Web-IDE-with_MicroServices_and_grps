@@ -142,10 +142,27 @@ export const apiSlice = createApi({
       providesTags: ['Workspaces'],
     }),
 
-    deleteWorkspace: builder.mutation<void, string>({
-      query: (userId) => ({
-        url: `/workspaces/${userId}`,
+    deleteWorkspace: builder.mutation<void, { workspaceId: string; userId: string }>({
+      query: ({ workspaceId, userId }) => ({
+        url: `/workspaces/${workspaceId}`,
         method: 'DELETE',
+        body: { userId }
+      }),
+      invalidatesTags: ['Workspaces'],
+    }),
+
+    stopWorkspace: builder.mutation<void, { workspaceId: string }>({
+      query: ({ workspaceId }) => ({
+        url: `/workspaces/${workspaceId}/stop`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Workspaces'],
+    }),
+
+    startWorkspace: builder.mutation<void, { workspaceId: string }>({
+      query: ({ workspaceId }) => ({
+        url: `/workspaces/${workspaceId}/start`,
+        method: 'POST',
       }),
       invalidatesTags: ['Workspaces'],
     }),
@@ -408,6 +425,8 @@ export const apiSlice = createApi({
 export const {
   useGetWorkspacesQuery,
   useDeleteWorkspaceMutation,
+  useStopWorkspaceMutation,
+  useStartWorkspaceMutation,
   useCreateContainerMutation,
   useGetFilesQuery,
   useGetFileTreeQuery,

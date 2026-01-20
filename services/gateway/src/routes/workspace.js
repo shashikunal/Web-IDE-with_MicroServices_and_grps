@@ -91,6 +91,37 @@ router.delete('/:workspaceId', asyncHandler(async (req, res) => {
   }
 
   res.status(response.status).json(data);
+  res.status(response.status).json(data);
+}));
+
+router.post('/:workspaceId/stop', asyncHandler(async (req, res) => {
+  const { workspaceId } = req.params;
+  await redisClient.delete(`workspaces:${req.user.userId}:list`);
+  await redisClient.deletePattern(`workspace:${req.user.userId}:${workspaceId}:*`);
+
+  const response = await fetch(`${workspaceServiceUrl}/workspace/${workspaceId}/stop`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId: req.user.userId })
+  });
+
+  const data = await response.json();
+  res.status(response.status).json(data);
+}));
+
+router.post('/:workspaceId/start', asyncHandler(async (req, res) => {
+  const { workspaceId } = req.params;
+  await redisClient.delete(`workspaces:${req.user.userId}:list`);
+  await redisClient.deletePattern(`workspace:${req.user.userId}:${workspaceId}:*`);
+
+  const response = await fetch(`${workspaceServiceUrl}/workspace/${workspaceId}/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId: req.user.userId })
+  });
+
+  const data = await response.json();
+  res.status(response.status).json(data);
 }));
 
 router.get('/:workspaceId/files', asyncHandler(async (req, res) => {

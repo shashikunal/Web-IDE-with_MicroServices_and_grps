@@ -3,7 +3,18 @@ import { Tree, TreeApi } from 'react-arborist';
 import type { FileItem } from '../../store/api/apiSlice';
 import clsx from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { ChevronRight, ChevronDown, File, Folder, FolderOpen } from 'lucide-react';
+import {
+  ChevronRight,
+  ChevronDown,
+  File,
+  Folder,
+  FolderOpen,
+  FileCode,
+  FileJson,
+  FileText,
+  Image as ImageIcon,
+  Settings
+} from 'lucide-react';
 
 interface FileExplorerProps {
   files: FileItem[];
@@ -15,30 +26,54 @@ interface FileExplorerProps {
   className?: string;
 }
 
-const FILE_ICONS: Record<string, string> = {
-  js: '📄', ts: '📘', jsx: '⚛️', tsx: '⚛️', json: '📋', md: '📝',
-  html: '🌐', css: '🎨', py: '🐍', go: '🔵', cpp: '🟣', rs: '🦀',
-  java: '☕', sh: '💻', dockerfile: '🐳', yaml: '⚙️', yml: '⚙️',
-  default: '📄', folder: '📁', folderOpen: '📂'
+// Modern file type colors and icons
+const FILE_TYPE_CONFIG: Record<string, { icon: React.ReactNode; color: string }> = {
+  // JavaScript/TypeScript
+  js: { icon: <FileCode size={16} />, color: '#f7df1e' },
+  jsx: { icon: <FileCode size={16} />, color: '#61dafb' },
+  ts: { icon: <FileCode size={16} />, color: '#3178c6' },
+  tsx: { icon: <FileCode size={16} />, color: '#3178c6' },
+
+  // Markup/Styles
+  html: { icon: <FileCode size={16} />, color: '#e34c26' },
+  css: { icon: <FileCode size={16} />, color: '#264de4' },
+  scss: { icon: <FileCode size={16} />, color: '#cc6699' },
+
+  // Config/Data
+  json: { icon: <FileJson size={16} />, color: '#ffd700' },
+  yaml: { icon: <Settings size={16} />, color: '#cb171e' },
+  yml: { icon: <Settings size={16} />, color: '#cb171e' },
+
+  // Documentation
+  md: { icon: <FileText size={16} />, color: '#519aba' },
+  txt: { icon: <FileText size={16} />, color: '#858585' },
+
+  // Images
+  png: { icon: <ImageIcon size={16} />, color: '#a074c4' },
+  jpg: { icon: <ImageIcon size={16} />, color: '#a074c4' },
+  jpeg: { icon: <ImageIcon size={16} />, color: '#a074c4' },
+  svg: { icon: <ImageIcon size={16} />, color: '#ffb13b' },
+
+  // Other
+  py: { icon: <FileCode size={16} />, color: '#3776ab' },
+  go: { icon: <FileCode size={16} />, color: '#00add8' },
+  rs: { icon: <FileCode size={16} />, color: '#dea584' },
+  java: { icon: <FileCode size={16} />, color: '#f89820' },
+
+  // Default
+  default: { icon: <File size={16} />, color: '#858585' }
 };
 
-function getFileIcon(name: string, type: 'file' | 'directory', isOpen?: boolean): React.ReactNode {
-  // We can stick to emojis for file types as they are colorful, or switch to Lucide if we had a full map.
-  // For 'perfect' aesthetics, consistent icon sets are better, but emojis are a quick win for variety.
-  // Let's keep emojis for files but ensure folders look good.
-
+function getFileIcon(name: string, type: 'file' | 'directory', isOpen?: boolean): { icon: React.ReactNode; color: string } {
   if (type === 'directory') {
-    return isOpen ?
-      <FolderOpen size={16} className="text-[#a8a8a8]" strokeWidth={1.5} /> :
-      <Folder size={16} className="text-[#a8a8a8]" strokeWidth={1.5} />;
+    return {
+      icon: isOpen ? <FolderOpen size={16} strokeWidth={1.5} /> : <Folder size={16} strokeWidth={1.5} />,
+      color: isOpen ? '#dcb67a' : '#8c8c8c'
+    };
   }
 
   const ext = name.split('.').pop()?.toLowerCase() || '';
-  // Special case for some icons using Lucide if desired, otherwise fallback to emoji map
-  if (['ts', 'tsx', 'js', 'jsx'].includes(ext)) return <span className="text-sm">⚡</span>;
-  if (['css', 'html'].includes(ext)) return <span className="text-sm">🌐</span>;
-
-  return <span className="text-sm opacity-80">{FILE_ICONS[ext] || FILE_ICONS.default}</span>;
+  return FILE_TYPE_CONFIG[ext] || FILE_TYPE_CONFIG.default;
 }
 
 export default function FileExplorer({
@@ -53,7 +88,6 @@ export default function FileExplorer({
   const data = useMemo(() => {
     if (!files || files.length === 0) return [];
 
-    // Recursive function to ensure children property exists
     const normalize = (items: FileItem[]): FileItem[] => {
       return items.map(item => ({
         ...item,
@@ -62,9 +96,9 @@ export default function FileExplorer({
     };
 
     const root = files[0];
-    // Return normalized children of root
     return root?.children ? normalize(root.children) : [];
   }, [files]);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const treeRef = useRef<TreeApi<FileItem>>(null);
   const [dimensions, setDimensions] = React.useState({ width: 0, height: 0 });
@@ -87,17 +121,14 @@ export default function FileExplorer({
     return () => observer.disconnect();
   }, []);
 
-  // Sync expanded folders state with tree
   useEffect(() => {
     if (!treeRef.current) return;
 
-    // Slight delay to ensure tree has reconciled data
     const timer = setTimeout(() => {
       const tree = treeRef.current;
       if (!tree) return;
 
       expandedFolders.forEach(path => {
-        // Only attempt to open if it's not already open
         if (!tree.isOpen(path)) {
           tree.open(path);
         }
@@ -110,7 +141,7 @@ export default function FileExplorer({
   return (
     <div
       ref={containerRef}
-      className={twMerge("h-full w-full overflow-hidden bg-[#252526]", className)}
+      className={twMerge("h-full w-full overflow-hidden bg-[var(--color-vs-sidebar)]", className)}
       onContextMenu={(e) => {
         if (e.target === e.currentTarget) {
           onContextMenu(e, 'background');
@@ -125,43 +156,28 @@ export default function FileExplorer({
           openByDefault={false}
           width={dimensions.width}
           height={dimensions.height}
-          indent={10}
-          rowHeight={22}
+          indent={12}
+          rowHeight={24}
           padding={0}
           onToggle={async (id) => {
             const tree = treeRef.current;
             if (tree) {
               const isNodeOpen = tree.isOpen(id);
               const isExpanded = expandedFolders.has(id);
-              // If tree state matches expanded state, this toggle was likely
-              // caused by our sync effect (programmatic open), so ignore it
-              // to prevent toggling it back (collapsing).
               if (isNodeOpen === isExpanded) return;
             }
             onFolderToggle(id);
           }}
           onMove={async ({ dragIds, parentId, index }) => {
             if (onMove && dragIds.length > 0) {
-              const src = dragIds[0]; // The ID is the full path
-              // Calculate destination path
-              // parentId is the path of the destination folder (or null? No, arborist uses null for root usually if dataset is flat, but here it's nested)
-              // If parentId is null, it means top level of 'data', which means direct child of 'root' (files[0]).
-              // But 'root' path is typically empty string or '.'.
-              // Let's assume parentId is the path of the folder.
-              // If we drop at top level, parentId might be null.
-
+              const src = dragIds[0];
               const fileName = src.split('/').pop();
               if (!fileName) return;
 
               let dest = '';
               if (parentId === null) {
-                // Moved to root (of the view, which is root folder)
                 dest = fileName;
               } else {
-                // parentId is the path of the target folder
-                // If parentId has trailing slash, remove it?
-                // Paths seem to not have trailing slashes based on fileController.
-                // But let's handle ensuring separator.
                 dest = `${parentId}/${fileName}`.replace('//', '/');
               }
 
@@ -180,22 +196,23 @@ export default function FileExplorer({
         >
           {({ node, style, dragHandle }) => {
             const isFolder = node.data.type === 'directory';
-            const icon = getFileIcon(node.data.name, node.data.type, node.isOpen);
+            const { icon, color } = getFileIcon(node.data.name, node.data.type, node.isOpen);
 
             return (
               <div
                 style={style}
                 ref={dragHandle}
                 className={clsx(
-                  "flex items-center px-6 cursor-pointer select-none text-[13px] transition-colors",
-                  "text-[#cccccc] hover:bg-[#2a2d2e]",
-                  node.isSelected && "bg-[#37373d] text-white",
-                  node.isFocused && "outline outline-1 outline-[#007acc] -outline-offset-1"
+                  "group flex items-center px-2 cursor-pointer select-none text-[13px] font-normal",
+                  "transition-all duration-150 ease-out",
+                  "text-[var(--color-vs-text)]",
+                  "hover:bg-[var(--color-vs-activity)]",
+                  node.isSelected && "bg-[var(--color-vs-accent)] text-white font-medium",
+                  node.isFocused && "ring-1 ring-inset ring-[var(--color-vs-status)]"
                 )}
                 draggable="true"
                 onClick={() => {
                   node.select();
-                  // If directory, toggle is handled by onActivate or explicit click on arrow
                 }}
                 onContextMenu={(e) => {
                   e.preventDefault();
@@ -203,19 +220,48 @@ export default function FileExplorer({
                   onContextMenu(e, isFolder ? 'folder' : 'file', node.data.path, node.data.name);
                 }}
               >
+                {/* Chevron for folders */}
                 <span
-                  className="mr-2 w-4 flex justify-center text-[#cccccc] hover:text-white"
+                  className={clsx(
+                    "mr-1 w-4 h-4 flex items-center justify-center flex-shrink-0",
+                    "text-[var(--color-vs-text-muted)] transition-all duration-200",
+                    isFolder && "hover:text-[var(--color-vs-text)] hover:bg-white/5 rounded",
+                    !isFolder && "opacity-0"
+                  )}
                   onClick={(e) => {
                     e.stopPropagation();
                     if (isFolder) node.toggle();
                   }}
                 >
                   {isFolder && (
-                    node.isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />
+                    <span className={clsx("transition-transform duration-200", node.isOpen && "rotate-90")}>
+                      <ChevronRight size={14} strokeWidth={2} />
+                    </span>
                   )}
                 </span>
-                <span className="mr-2 flex items-center justify-center w-4">{icon}</span>
-                <span className="truncate flex-1 font-normal opacity-90">{node.data.name}</span>
+
+                {/* File/Folder Icon */}
+                <span
+                  className="mr-2 flex items-center justify-center w-4 h-4 flex-shrink-0 transition-all duration-200"
+                  style={{ color: node.isSelected ? 'currentColor' : color }}
+                >
+                  {icon}
+                </span>
+
+                {/* File/Folder Name */}
+                <span className={clsx(
+                  "truncate flex-1 tracking-tight",
+                  node.isSelected ? "font-medium" : "font-normal opacity-90"
+                )}>
+                  {node.data.name}
+                </span>
+
+                {/* Hover indicator */}
+                {!node.isSelected && (
+                  <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <span className="w-1 h-1 rounded-full bg-[var(--color-vs-status)]" />
+                  </span>
+                )}
               </div>
             );
           }}

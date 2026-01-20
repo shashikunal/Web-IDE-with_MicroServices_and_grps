@@ -343,6 +343,96 @@ app.delete('/workspace/:workspaceId', asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Workspace deleted' });
 }));
 
+app.post('/workspace/:workspaceId/stop', asyncHandler(async (req, res) => {
+  const { workspaceId } = req.params;
+  const { userId } = req.body;
+
+  const workspace = await Workspace.findOne({ workspaceId, userId });
+  if (!workspace) {
+    return res.status(404).json({ success: false, message: 'Workspace not found' });
+  }
+
+  if (workspace.containerId && docker) {
+    try {
+      const container = docker.getContainer(workspace.containerId);
+      await container.stop();
+      workspace.status = 'stopped';
+      await workspace.save();
+    } catch (error) {
+      if (error.statusCode === 304) {
+        // Container already stopped
+        workspace.status = 'stopped';
+        await workspace.save();
+      } else if (error.statusCode === 404) {
+        // Container not found, might have been removed
+        workspace.status = 'stopped';
+        workspace.containerId = null;
+        await workspace.save();
+      } else {
+        throw error;
+      }
+    }
+  } else {
+    workspace.status = 'stopped';
+    await workspace.save();
+  }
+
+  res.json({ success: true, message: 'Workspace stopped', status: 'stopped' });
+}));
+
+app.post('/workspace/:workspaceId/start', asyncHandler(async (req, res) => {
+  const { workspaceId } = req.params;
+  const { userId } = req.body;
+
+  const workspace = await Workspace.findOne({ workspaceId, userId });
+  if (!workspace) {
+    return res.status(404).json({ success: false, message: 'Workspace not found' });
+  }
+
+  if (workspace.containerId && docker) {
+    try {
+      const container = docker.getContainer(workspace.containerId);
+      await container.start();
+      workspace.status = 'running';
+      await workspace.save();
+    } catch (error) {
+      if (error.statusCode === 304) {
+         // Container already started
+        workspace.status = 'running';
+        await workspace.save();
+      } else if (error.statusCode === 404) {
+        // Container might be gone, try to recreate? 
+        // For now, let's just create a new one if it's missing
+        try {
+             // We need to re-create it using the logic from createContainer
+             const result = await createContainer(userId, workspaceId, workspace.templateId);
+             workspace.containerId = result.containerId;
+             workspace.publicPort = result.publicPort;
+             workspace.status = 'running';
+             await workspace.save();
+        } catch(createErr) {
+             throw createErr;
+        }
+      } else {
+        throw error;
+      }
+    }
+  } else {
+      // No container ID, create one
+      try {
+           const result = await createContainer(userId, workspaceId, workspace.templateId);
+           workspace.containerId = result.containerId;
+           workspace.publicPort = result.publicPort;
+           workspace.status = 'running';
+           await workspace.save();
+      } catch(createErr) {
+           throw createErr;
+      }
+  }
+
+  res.json({ success: true, message: 'Workspace started', status: 'running', publicPort: workspace.publicPort });
+}));
+
 app.post('/workspace/:workspaceId/files', asyncHandler(async (req, res) => {
   const { workspaceId } = req.params;
   const { userId, path: filePath } = req.body;

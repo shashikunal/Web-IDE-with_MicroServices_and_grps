@@ -1,5 +1,11 @@
-import { useGetWorkspacesQuery, useDeleteWorkspaceMutation } from '../../store/api/apiSlice';
+import {
+  useGetWorkspacesQuery,
+  useDeleteWorkspaceMutation,
+  useStopWorkspaceMutation,
+  useStartWorkspaceMutation
+} from '../../store/api/apiSlice';
 import type { Workspace } from '../../store/api/apiSlice';
+import toast from 'react-hot-toast';
 
 interface DashboardProps {
   onSelectWorkspace: (ws: Workspace) => void;
@@ -9,76 +15,102 @@ interface DashboardProps {
 export default function Dashboard({ onSelectWorkspace, onBack }: DashboardProps) {
   const { data: workspaces = [], isLoading, isError, error } = useGetWorkspacesQuery();
   const [deleteWorkspace, { isLoading: isDeleting }] = useDeleteWorkspaceMutation();
+  const [stopWorkspace] = useStopWorkspaceMutation();
+  const [startWorkspace] = useStartWorkspaceMutation();
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    if (!dateStr) return 'Never';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return 'Never';
+
+      const now = new Date();
+      const diff = now.getTime() - date.getTime();
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+      if (days === 0) {
+        return 'Today at ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      } else if (days === 1) {
+        return 'Yesterday at ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      } else {
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      }
+    } catch {
+      return 'Never';
+    }
   };
 
-  const handleDelete = async (userId: string, e: React.MouseEvent) => {
+  const handleStop = async (e: React.MouseEvent, workspaceId: string) => {
+    e.stopPropagation();
+    try {
+      await stopWorkspace({ workspaceId }).unwrap();
+      toast.success('Workspace stopped');
+    } catch {
+      toast.error('Failed to stop workspace');
+    }
+  };
+
+  const handleStart = async (e: React.MouseEvent, workspaceId: string) => {
+    e.stopPropagation();
+    try {
+      await startWorkspace({ workspaceId }).unwrap();
+      toast.success('Workspace started');
+    } catch {
+      toast.error('Failed to start workspace');
+    }
+  };
+
+  const handleDelete = async (userId: string, workspaceId: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('Delete requested for:', userId);
 
-    if (!confirm('Are you sure you want to delete this workspace? This will also stop and remove the container.')) return;
+    console.log('Delete clicked for workspace:', workspaceId, 'user:', userId);
+
+    if (!confirm('Are you sure you want to delete this workspace? This will also stop and remove the container.')) {
+      console.log('Delete cancelled by user');
+      return;
+    }
 
     try {
-      console.log('Sending delete mutation...');
-      await deleteWorkspace(userId).unwrap();
+      console.log('Calling deleteWorkspace mutation...');
+      await deleteWorkspace({ workspaceId, userId }).unwrap();
       console.log('Delete successful');
+      toast.success('Workspace deleted');
     } catch (err: any) {
       console.error('Delete failed:', err);
-      alert('Failed to delete workspace: ' + (err.data?.message || err.message || 'Unknown error'));
+      toast.error('Failed to delete workspace: ' + (err?.data?.message || err.message || 'Unknown error'));
     }
   };
 
   if (isError) {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#1e1e1e', color: '#cccccc', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
-        <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '40px 24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
+      <div className="min-h-screen bg-[var(--color-vs-bg)] text-[var(--color-vs-text)] font-sans flex items-center justify-center p-6">
+        <div className="w-full max-w-2xl">
+          <div className="flex items-center gap-4 mb-8">
             <button
               onClick={onBack}
-              style={{
-                background: 'none',
-                border: 'none',
-                padding: '8px',
-                cursor: 'pointer',
-                color: '#858585',
-                borderRadius: '4px'
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = '#cccccc'; e.currentTarget.style.backgroundColor = '#3d3d3d'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = '#858585'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+              className="p-2 text-[var(--color-vs-text-muted)] hover:text-[var(--color-vs-text)] hover:bg-[var(--color-vs-sidebar)] rounded-lg transition-all"
             >
               <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <h1 style={{ fontSize: '24px', fontWeight: 600, color: '#cccccc', margin: 0 }}>My Workspaces</h1>
+            <h1 className="text-3xl font-semibold text-[var(--color-vs-text)]">My Workspaces</h1>
           </div>
 
-          <div style={{ textAlign: 'center', padding: '60px 0', backgroundColor: '#252526', borderRadius: '12px', border: '1px solid #3d3d3d' }}>
-            <div style={{ width: '64px', height: '64px', margin: '0 auto 16px', borderRadius: '50%', backgroundColor: '#f14c4c20', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="32" height="32" fill="none" stroke="#f14c4c" viewBox="0 0 24 24">
+          <div className="text-center py-20 bg-[var(--color-vs-sidebar)] rounded-2xl border border-[var(--color-vs-border)] shadow-medium">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[var(--color-vs-error)]/10 flex items-center justify-center border-2 border-[var(--color-vs-error)]/20">
+              <svg width="40" height="40" fill="none" stroke="var(--color-vs-error)" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h3 style={{ color: '#f14c4c', fontSize: '18px', marginBottom: '8px' }}>Failed to load workspaces</h3>
-            <p style={{ color: '#858585', fontSize: '14px', maxWidth: '400px', margin: '0 auto 24px' }}>
+            <h3 className="text-[var(--color-vs-error)] text-xl font-semibold mb-3">Failed to load workspaces</h3>
+            <p className="text-[var(--color-vs-text-muted)] text-base max-w-md mx-auto mb-8 leading-relaxed">
               {(error as any)?.data?.message || 'There was an error connecting to the server. Please try again later.'}
             </p>
             <button
               onClick={() => window.location.reload()}
-              style={{
-                padding: '10px 24px',
-                backgroundColor: '#3d3d3d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: 500,
-                cursor: 'pointer'
-              }}
+              className="px-8 py-3 bg-[var(--color-vs-status)] hover:bg-[var(--color-vs-status)]/80 text-white rounded-lg text-sm font-medium transition-all shadow-soft hover:shadow-medium"
             >
               Retry
             </button>
@@ -89,112 +121,126 @@ export default function Dashboard({ onSelectWorkspace, onBack }: DashboardProps)
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#1e1e1e', color: '#cccccc', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
-      <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '40px 24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
+    <div className="min-h-screen bg-[var(--color-vs-bg)] text-[var(--color-vs-text)] font-sans">
+      <div className="w-full max-w-7xl mx-auto px-6 py-10">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-10">
           <button
             onClick={onBack}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: '8px',
-              cursor: 'pointer',
-              color: '#858585',
-              borderRadius: '4px'
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#cccccc'; e.currentTarget.style.backgroundColor = '#3d3d3d'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = '#858585'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+            className="p-2.5 text-[var(--color-vs-text-muted)] hover:text-[var(--color-vs-text)] hover:bg-[var(--color-vs-sidebar)] rounded-lg transition-all"
           >
             <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <div>
-            <h1 style={{ fontSize: '24px', fontWeight: 600, color: '#cccccc', margin: 0 }}>My Workspaces</h1>
-            <p style={{ color: '#858585', fontSize: '14px', marginTop: '4px' }}>Manage your saved code playgrounds</p>
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold text-[var(--color-vs-text)] tracking-tight">My Workspaces</h1>
+            <p className="text-[var(--color-vs-text-muted)] text-base mt-2">Manage and organize your development environments</p>
           </div>
         </div>
 
+        {/* Content */}
         {isLoading ? (
-          <div style={{ textAlign: 'center', padding: '60px 0' }}>
-            <div style={{ display: 'inline-block', width: '40px', height: '40px', border: '3px solid #3d3d3d', borderTopColor: '#007acc', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-            <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+          <div className="flex items-center justify-center py-32">
+            <div className="text-center">
+              <div className="loading-spinner mx-auto mb-4" />
+              <p className="text-[var(--color-vs-text-muted)] animate-pulse">Loading your workspaces...</p>
+            </div>
           </div>
         ) : (!workspaces || (Array.isArray(workspaces) && workspaces.length === 0)) ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', backgroundColor: '#252526', borderRadius: '12px', border: '1px solid #3d3d3d' }}>
-            <svg width="64" height="64" fill="none" stroke="#3d3d3d" viewBox="0 0 24 24" style={{ margin: '0 auto 16px' }}>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-            </svg>
-            <h3 style={{ color: '#858585', fontSize: '16px', marginBottom: '8px' }}>No workspaces yet</h3>
-            <p style={{ color: '#666', fontSize: '14px' }}>Create a new playground to get started</p>
+          <div className="text-center py-24 bg-[var(--color-vs-sidebar)] rounded-2xl border border-[var(--color-vs-border)] border-dashed">
+            <div className="w-24 h-24 mx-auto mb-6 rounded-2xl bg-[var(--color-vs-activity)] flex items-center justify-center">
+              <svg width="48" height="48" fill="none" stroke="var(--color-vs-text-muted)" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+            </div>
+            <h3 className="text-white text-2xl font-semibold mb-3">No workspaces yet</h3>
+            <p className="text-[var(--color-vs-text-muted)] text-base mb-10 max-w-md mx-auto leading-relaxed">
+              Start your coding journey by creating a new playground from our templates.
+            </p>
+            <button
+              onClick={onBack}
+              className="px-8 py-3 bg-[var(--color-vs-status)] hover:bg-[var(--color-vs-status)]/80 text-white rounded-lg font-medium transition-all shadow-soft hover:shadow-medium transform hover:scale-105"
+            >
+              Create New Workspace
+            </button>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {Array.isArray(workspaces) && workspaces.map((ws) => (
               <div
-                key={ws.userId}
+                key={ws.workspaceId}
                 onClick={() => onSelectWorkspace(ws)}
-                style={{
-                  padding: '20px',
-                  borderRadius: '12px',
-                  backgroundColor: '#252526',
-                  border: '1px solid #3d3d3d',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#007acc';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#3d3d3d';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                }}
+                className="group relative p-6 rounded-2xl bg-[var(--color-vs-sidebar)] border border-[var(--color-vs-border)] hover:border-[var(--color-vs-status)] transition-all duration-300 cursor-pointer shadow-soft hover:shadow-medium hover:-translate-y-1"
               >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '8px', backgroundColor: '#3d3d3d', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
-                      {ws.templateName === 'React' ? '⚛️' : ws.templateName === 'Node.js' ? '🟢' : ws.templateName === 'Python' ? '🐍' : ws.templateName === 'Go' ? '🔵' : ws.templateName === 'C++' ? '🟣' : ws.templateName === 'HTML' ? '📄' : '📁'}
+                {/* Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-12 h-12 rounded-xl bg-[var(--color-vs-activity)] flex items-center justify-center text-2xl flex-shrink-0 shadow-soft">
+                      {ws.templateName === 'react-app' ? '⚛️' : ws.templateName === 'node-hello' ? '🟢' : ws.templateName === 'python-flask' ? '🐍' : ws.templateName === 'go-api' ? '🔵' : ws.templateName === 'cpp-hello' ? '🟣' : ws.templateName === 'html-site' ? '📄' : '📁'}
                     </div>
-                    <div>
-                      <h3 style={{ fontWeight: 600, color: 'white', fontSize: '15px', margin: 0 }}>{ws.templateName}</h3>
-                      <p style={{ color: '#858585', fontSize: '12px', marginTop: '2px' }}>{ws.language}</p>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-white text-base truncate group-hover:text-[var(--color-vs-status)] transition-colors">{ws.templateName}</h3>
+                      <p className="text-[var(--color-vs-text-muted)] text-sm mt-0.5 capitalize truncate">{ws.language}</p>
                     </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: ws.status === 'running' ? '#4ec9b0' : '#f14c4c' }} />
-                    <span style={{ fontSize: '11px', color: '#858585' }}>{ws.status}</span>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ fontSize: '12px', color: '#666' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 0 0118 0z" />
-                      </svg>
-                      {formatDate(ws.lastAccessedAt)}
-                    </span>
+                {/* Status Badge */}
+                <div className="mb-4">
+                  <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${ws.status === 'running'
+                      ? 'bg-[var(--color-vs-success)]/10 text-[var(--color-vs-success)] border-[var(--color-vs-success)]/20'
+                      : 'bg-[var(--color-vs-error)]/10 text-[var(--color-vs-error)] border-[var(--color-vs-error)]/20'
+                    }`}>
+                    <div className={`w-2 h-2 rounded-full ${ws.status === 'running' ? 'bg-[var(--color-vs-success)] animate-pulse' : 'bg-[var(--color-vs-error)]'}`} />
+                    <span className="uppercase tracking-wider">{ws.status}</span>
                   </div>
-                  <button
-                    onClick={(e) => handleDelete(ws.userId, e)}
-                    disabled={isDeleting}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: '6px',
-                      cursor: isDeleting ? 'wait' : 'pointer',
-                      color: '#858585',
-                      borderRadius: '4px',
-                      opacity: isDeleting ? 0.5 : 1
-                    }}
-                    onMouseEnter={(e) => { if (!isDeleting) { e.currentTarget.style.color = '#f14c4c'; e.currentTarget.style.backgroundColor = 'rgba(241, 76, 76, 0.1)'; } }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = '#858585'; e.currentTarget.style.backgroundColor = 'transparent'; }}
-                  >
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-between pt-4 border-t border-[var(--color-vs-border)]">
+                  <div className="text-xs text-[var(--color-vs-text-muted)] flex items-center gap-1.5">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 0 0118 0z" />
                     </svg>
-                  </button>
+                    <span className="truncate">{formatDate(ws.lastAccessedAt || ws.createdAt)}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    {ws.status === 'running' ? (
+                      <button
+                        onClick={(e) => handleStop(e, ws.workspaceId)}
+                        title="Pause Workspace"
+                        className="p-2 rounded-lg text-[var(--color-vs-text-muted)] hover:text-[var(--color-vs-warning)] hover:bg-[var(--color-vs-warning)]/10 transition-all"
+                      >
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                          <rect x="6" y="4" width="4" height="16" />
+                          <rect x="14" y="4" width="4" height="16" />
+                        </svg>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => handleStart(e, ws.workspaceId)}
+                        title="Resume Workspace"
+                        className="p-2 rounded-lg text-[var(--color-vs-text-muted)] hover:text-[var(--color-vs-success)] hover:bg-[var(--color-vs-success)]/10 transition-all"
+                      >
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={(e) => handleDelete(ws.userId, ws.workspaceId, e)}
+                      disabled={isDeleting}
+                      title="Delete Workspace"
+                      className="p-2 rounded-lg text-[var(--color-vs-text-muted)] hover:text-[var(--color-vs-error)] hover:bg-[var(--color-vs-error)]/10 transition-all disabled:opacity-50 disabled:cursor-wait"
+                    >
+                      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
