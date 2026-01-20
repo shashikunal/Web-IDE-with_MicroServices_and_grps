@@ -230,7 +230,7 @@ export const apiSlice = createApi({
       query: ({ workspaceId, path }) => ({
         url: `/workspaces/${workspaceId}/directory`,
         method: 'POST',
-        body: { path: '.', directoryName: path }, // Adjust if path includes parent
+        body: { path },
       }),
       invalidatesTags: (_result, _error, { workspaceId }) => [
         { type: 'Files', id: workspaceId },
@@ -249,10 +249,10 @@ export const apiSlice = createApi({
     }),
 
     moveFile: builder.mutation<void, { userId: string; workspaceId: string; sourcePath: string; destinationPath: string }>({
-      query: ({ userId, sourcePath, destinationPath }) => ({
+      query: ({ userId, workspaceId, sourcePath, destinationPath }) => ({
         url: '/container/move',
         method: 'POST',
-        body: { userId, sourcePath, destinationPath },
+        body: { userId, workspaceId, sourcePath, destinationPath },
       }),
       invalidatesTags: (_result, _error, { workspaceId }) => [
         { type: 'Files', id: workspaceId },
@@ -260,10 +260,10 @@ export const apiSlice = createApi({
     }),
 
     copyFile: builder.mutation<void, { userId: string; workspaceId: string; sourcePath: string; destinationPath: string }>({
-      query: ({ userId, sourcePath, destinationPath }) => ({
+      query: ({ userId, workspaceId, sourcePath, destinationPath }) => ({
         url: '/container/copy',
         method: 'POST',
-        body: { userId, sourcePath, destinationPath },
+        body: { userId, workspaceId, sourcePath, destinationPath },
       }),
       invalidatesTags: (_result, _error, { workspaceId }) => [
         { type: 'Files', id: workspaceId },

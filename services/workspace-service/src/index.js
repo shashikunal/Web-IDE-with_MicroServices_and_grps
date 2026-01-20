@@ -108,9 +108,19 @@ async function createContainer(userId, workspaceId, templateId) {
   const containerId = `cp-${workspaceId.slice(0, 8)}-${Date.now().toString(36)}`;
 
   try {
-    const image = await docker.getImage(template.image).inspect();
-    if (!image) {
-      await docker.pull(template.image);
+    try {
+      await docker.getImage(template.image).inspect();
+    } catch (error) {
+      if (error.statusCode === 404) {
+        logger.info(`Pulling image ${template.image}...`);
+        const stream = await docker.pull(template.image);
+        await new Promise((resolve, reject) => {
+          docker.modem.followProgress(stream, (err, res) => err ? reject(err) : resolve(res));
+        });
+        logger.info(`Image ${template.image} pulled.`);
+      } else {
+        throw error;
+      }
     }
 
     // Create port bindings - map container port to a random host port
@@ -256,7 +266,8 @@ app.post('/workspace', asyncHandler(async (req, res) => {
     containerId = result.containerId;
     publicPort = result.publicPort;
   } catch (error) {
-    logger.warn('Container creation failed, continuing without container:', error.message);
+    logger.error('Container creation failed:', error);
+    return res.status(500).json({ success: false, message: `Container creation failed: ${error.message}` });
   }
 
   const workspace = new Workspace({
@@ -492,10 +503,21 @@ app.post('/workspace/:workspaceId/tree', asyncHandler(async (req, res) => {
       const children = [];
 
       for (const entry of entries) {
-        if (entry.name === 'node_modules' || entry.name === '.git') continue;
+        if (entry.name === '.git') continue;
 
         const entryRelativePath = path.join(relativePath, entry.name);
         const entryAbsolutePath = path.join(dirPath, entry.name);
+
+        if (entry.name === 'node_modules') {
+          children.push({
+            name: entry.name,
+            path: entryRelativePath,
+            type: 'directory',
+            isFolder: true,
+            children: []
+          });
+          continue;
+        }
 
         if (entry.isDirectory()) {
           const subTree = await buildTree(entryAbsolutePath, entryRelativePath);

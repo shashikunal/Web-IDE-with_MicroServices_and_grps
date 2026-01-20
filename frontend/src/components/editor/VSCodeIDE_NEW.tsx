@@ -624,6 +624,7 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
 
   const connectTerminal = useCallback((terminalId: string, isMain: boolean) => {
     if (socketsRef.current.has(terminalId)) return;
+    if (!containerId || containerId === 'null') return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//localhost:3000/ws?userId=${userId}&termId=${terminalId}&containerId=${containerId}`;
@@ -688,7 +689,7 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
       if (isMain) setIsConnected(false);
     };
 
-  }, [userId, template.id, template.name]);
+  }, [userId, template.id, template.name, containerId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -1062,6 +1063,18 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
                             <span className="text-xs font-bold text-[#bbbbbb] group-hover:text-white uppercase truncate">
                               {template.name || 'Workspace'}
                             </span>
+                          </div>
+                          <div className="flex items-center mr-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRefreshExplorer();
+                              }}
+                              className="p-1 hover:bg-[#3c3c3c] rounded text-[#858585] hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+                              title="Refresh Explorer"
+                            >
+                              <RefreshCw size={12} />
+                            </button>
                           </div>
                         </div>
                         <div className={`flex-1 overflow-hidden ${isExplorerCollapsed ? 'hidden' : ''}`}>
