@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package auth;
+
+service AuthService {
+  rpc Register(RegisterRequest) returns (AuthResponse);
+  rpc Login(LoginRequest) returns (AuthResponse);
+  rpc VerifyToken(VerifyTokenRequest) returns (VerifyTokenResponse);
+  rpc RefreshToken(RefreshTokenRequest) returns (AuthResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  rpc ChangePassword(ChangePasswordRequest) returns (AuthResponse);
+  rpc ValidateSession(ValidateSessionRequest) returns (ValidateSessionResponse);
+}
+
+message RegisterRequest {
+  string username = 1;
+  string email = 2;
+  string password = 3;
+  string role = 4;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message AuthResponse {
+  bool success = 1;
+  string message = 2;
+  string accessToken = 3;
+  string refreshToken = 4;
+  User user = 5;
+}
+
+message User {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  string role = 4;
+  bool isActive = 5;
+  string createdAt = 6;
+}
+
+message VerifyTokenRequest {
+  string token = 1;
+}
+
+message VerifyTokenResponse {
+  bool valid = 1;
+  string userId = 2;
+  string role = 3;
+  string email = 4;
+}
+
+message RefreshTokenRequest {
+  string refreshToken = 1;
+}
+
+message LogoutRequest {
+  string userId = 1;
+  string token = 2;
+}
+
+message LogoutResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ChangePasswordRequest {
+  string userId = 1;
+  string currentPassword = 2;
+  string newPassword = 3;
+}
+
+message ValidateSessionRequest {
+  string sessionId = 1;
+  string userId = 2;
+}
+
+message ValidateSessionResponse {
+  bool valid = 1;
+  User user = 2;
+}

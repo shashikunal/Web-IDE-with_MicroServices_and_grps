@@ -1,0 +1,160 @@
+syntax = "proto3";
+
+package workspace;
+
+service WorkspaceService {
+  rpc GetWorkspaces(GetWorkspacesRequest) returns (WorkspaceListResponse);
+  rpc GetWorkspace(GetWorkspaceRequest) returns (WorkspaceResponse);
+  rpc CreateWorkspace(CreateWorkspaceRequest) returns (WorkspaceResponse);
+  rpc DeleteWorkspace(DeleteWorkspaceRequest) returns (OperationResponse);
+  rpc CreateFromTemplate(CreateFromTemplateRequest) returns (WorkspaceResponse);
+  rpc ListFiles(ListFilesRequest) returns (FileListResponse);
+  rpc GetFileContent(GetFileContentRequest) returns (FileContentResponse);
+  rpc SaveFile(SaveFileRequest) returns (OperationResponse);
+  rpc CreateDirectory(CreateDirectoryRequest) returns (OperationResponse);
+  rpc DeleteFile(DeleteFileRequest) returns (OperationResponse);
+  rpc MoveFile(MoveFileRequest) returns (OperationResponse);
+  rpc CopyFile(CopyFileRequest) returns (OperationResponse);
+  rpc GetFileTree(GetFileTreeRequest) returns (FileTreeResponse);
+}
+
+message GetWorkspacesRequest {
+  string userId = 1;
+  int32 page = 2;
+  int32 limit = 3;
+}
+
+message Workspace {
+  string id = 1;
+  string userId = 2;
+  string workspaceId = 3;
+  string templateId = 4;
+  string templateName = 5;
+  string language = 6;
+  string containerId = 7;
+  int32 publicPort = 8;
+  string status = 9;
+  string createdAt = 10;
+  string lastAccessedAt = 11;
+  string workspacePath = 12;
+}
+
+message WorkspaceListResponse {
+  bool success = 1;
+  string message = 2;
+  repeated Workspace workspaces = 3;
+  int32 total = 4;
+}
+
+message GetWorkspaceRequest {
+  string userId = 1;
+  string workspaceId = 2;
+}
+
+message WorkspaceResponse {
+  bool success = 1;
+  string message = 2;
+  Workspace workspace = 3;
+}
+
+message CreateWorkspaceRequest {
+  string userId = 1;
+  string templateId = 2;
+  string language = 3;
+}
+
+message DeleteWorkspaceRequest {
+  string userId = 1;
+  string workspaceId = 2;
+}
+
+message CreateFromTemplateRequest {
+  string userId = 1;
+  string templateId = 2;
+}
+
+message ListFilesRequest {
+  string userId = 1;
+  string workspaceId = 2;
+  string path = 3;
+}
+
+message FileNode {
+  string name = 1;
+  string path = 2;
+  bool isDirectory = 3;
+  int64 size = 4;
+  string modifiedAt = 5;
+}
+
+message FileListResponse {
+  bool success = 1;
+  string message = 2;
+  repeated FileNode files = 3;
+  string currentPath = 4;
+}
+
+message GetFileContentRequest {
+  string userId = 1;
+  string workspaceId = 2;
+  string filePath = 3;
+}
+
+message FileContentResponse {
+  bool success = 1;
+  string message = 2;
+  string content = 3;
+  string encoding = 4;
+}
+
+message SaveFileRequest {
+  string userId = 1;
+  string workspaceId = 2;
+  string filePath = 3;
+  string content = 4;
+}
+
+message CreateDirectoryRequest {
+  string userId = 1;
+  string workspaceId = 2;
+  string path = 3;
+  string directoryName = 4;
+}
+
+message DeleteFileRequest {
+  string userId = 1;
+  string workspaceId = 2;
+  string path = 3;
+  bool recursive = 4;
+}
+
+message MoveFileRequest {
+  string userId = 1;
+  string workspaceId = 2;
+  string sourcePath = 3;
+  string destinationPath = 4;
+}
+
+message CopyFileRequest {
+  string userId = 1;
+  string workspaceId = 2;
+  string sourcePath = 3;
+  string destinationPath = 4;
+}
+
+message GetFileTreeRequest {
+  string userId = 1;
+  string workspaceId = 2;
+  string rootPath = 3;
+}
+
+message FileTreeResponse {
+  bool success = 1;
+  string message = 2;
+  FileNode root = 3;
+}
+
+message OperationResponse {
+  bool success = 1;
+  string message = 2;
+}

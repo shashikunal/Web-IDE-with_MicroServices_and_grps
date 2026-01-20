@@ -1,0 +1,210 @@
+syntax = "proto3";
+
+package apitest;
+
+service ApiTestService {
+  rpc GetCollections(GetCollectionsRequest) returns (CollectionListResponse);
+  rpc CreateCollection(CreateCollectionRequest) returns (CollectionResponse);
+  rpc DeleteCollection(DeleteCollectionRequest) returns (OperationResponse);
+  rpc GetRequests(GetRequestsRequest) returns (RequestListResponse);
+  rpc SaveRequest(SaveRequestRequest) returns (RequestResponse);
+  rpc DeleteRequest(DeleteRequestRequest) returns (OperationResponse);
+  rpc GetEnvironments(GetEnvironmentsRequest) returns (EnvironmentListResponse);
+  rpc SaveEnvironment(SaveEnvironmentRequest) returns (EnvironmentResponse);
+  rpc DeleteEnvironment(DeleteEnvironmentRequest) returns (OperationResponse);
+  rpc GetHistory(GetHistoryRequest) returns (HistoryListResponse);
+  rpc AddToHistory(AddToHistoryRequest) returns (HistoryResponse);
+  rpc ExecuteRequest(ExecuteRequestRequest) returns (ExecuteResponse);
+}
+
+message GetCollectionsRequest {
+  string userId = 1;
+}
+
+message ApiCollection {
+  string id = 1;
+  string workspaceId = 2;
+  string name = 3;
+  string parentId = 4;
+  string createdAt = 5;
+}
+
+message CollectionListResponse {
+  bool success = 1;
+  string message = 2;
+  repeated ApiCollection collections = 3;
+}
+
+message CreateCollectionRequest {
+  string userId = 1;
+  string workspaceId = 2;
+  string name = 3;
+  string parentId = 4;
+}
+
+message CollectionResponse {
+  bool success = 1;
+  string message = 2;
+  ApiCollection collection = 3;
+}
+
+message DeleteCollectionRequest {
+  string userId = 1;
+  string collectionId = 2;
+}
+
+message GetRequestsRequest {
+  string userId = 1;
+  string collectionId = 2;
+}
+
+message ApiRequest {
+  string id = 1;
+  string workspaceId = 2;
+  string collectionId = 3;
+  string name = 4;
+  string method = 5;
+  string url = 6;
+  repeated Header headers = 7;
+  string bodyType = 8;
+  string body = 9;
+  repeated FormDataItem formData = 10;
+  AuthConfig auth = 11;
+  string testScript = 12;
+  string createdAt = 13;
+}
+
+message Header {
+  string key = 1;
+  string value = 2;
+  bool enabled = 3;
+}
+
+message FormDataItem {
+  string key = 1;
+  string value = 2;
+  string type = 3;
+  bool enabled = 4;
+}
+
+message AuthConfig {
+  string type = 1;
+  string token = 2;
+  string username = 3;
+  string password = 4;
+}
+
+message RequestListResponse {
+  bool success = 1;
+  string message = 2;
+  repeated ApiRequest requests = 3;
+}
+
+message SaveRequestRequest {
+  string userId = 1;
+  ApiRequest request = 2;
+}
+
+message RequestResponse {
+  bool success = 1;
+  string message = 2;
+  ApiRequest request = 3;
+}
+
+message DeleteRequestRequest {
+  string userId = 1;
+  string requestId = 2;
+}
+
+message GetEnvironmentsRequest {
+  string userId = 1;
+}
+
+message EnvironmentVariable {
+  string key = 1;
+  string value = 2;
+  bool enabled = 3;
+}
+
+message ApiEnvironment {
+  string id = 1;
+  string workspaceId = 2;
+  string name = 3;
+  repeated EnvironmentVariable variables = 4;
+  string createdAt = 5;
+}
+
+message EnvironmentListResponse {
+  bool success = 1;
+  string message = 2;
+  repeated ApiEnvironment environments = 3;
+}
+
+message SaveEnvironmentRequest {
+  string userId = 1;
+  ApiEnvironment environment = 2;
+}
+
+message EnvironmentResponse {
+  bool success = 1;
+  string message = 2;
+  ApiEnvironment environment = 3;
+}
+
+message DeleteEnvironmentRequest {
+  string userId = 1;
+  string environmentId = 2;
+}
+
+message GetHistoryRequest {
+  string userId = 1;
+  int32 limit = 2;
+}
+
+message ApiHistory {
+  string id = 1;
+  string workspaceId = 2;
+  string method = 3;
+  string url = 4;
+  int32 status = 5;
+  int64 time = 6;
+  string executedAt = 7;
+}
+
+message HistoryListResponse {
+  bool success = 1;
+  string message = 2;
+  repeated ApiHistory history = 3;
+}
+
+message AddToHistoryRequest {
+  string userId = 1;
+  ApiHistory history = 2;
+}
+
+message HistoryResponse {
+  bool success = 1;
+  string message = 2;
+  ApiHistory history = 3;
+}
+
+message ExecuteRequestRequest {
+  string userId = 1;
+  ApiRequest request = 2;
+  string environmentId = 3;
+}
+
+message ExecuteResponse {
+  bool success = 1;
+  string message = 2;
+  int32 status = 3;
+  int64 time = 4;
+  repeated Header responseHeaders = 5;
+  string body = 6;
+  string error = 7;
+}
+
+message OperationResponse {
+  bool success = 1;
+  string message = 2;
+}

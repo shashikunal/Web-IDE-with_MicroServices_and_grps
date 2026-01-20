@@ -1,0 +1,23 @@
+{
+  "name": "@coding-platform/auth-service",
+  "version": "1.0.0",
+  "description": "Authentication microservice with gRPC support",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongoose": "^8.0.3",
+    "bcryptjs": "^3.0.3",
+    "jsonwebtoken": "^9.0.3",
+    "uuid": "^9.0.1",
+    "ioredis": "^5.4.1",
+    "amqplib": "^0.10.4",
+    "@grpc/grpc-js": "^1.10.0",
+    "@grpc/proto-loader": "^0.7.13",
+    "winston": "^3.13.0"
+  }
+}

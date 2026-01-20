@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package terminal;
+
+service TerminalService {
+  rpc CreateSession(CreateSessionRequest) returns (SessionResponse);
+  rpc ExecuteCommand(ExecuteCommandRequest) returns (ExecuteResponse);
+  rpc GetActiveSessions(GetActiveSessionsRequest) returns (SessionsListResponse);
+  rpc KillSession(KillSessionRequest) returns (OperationResponse);
+  rpc ResizeTerminal(ResizeTerminalRequest) returns (OperationResponse);
+}
+
+message CreateSessionRequest {
+  string userId = 1;
+  string workspaceId = 2;
+  int32 cols = 3;
+  int32 rows = 4;
+}
+
+message TerminalSession {
+  string sessionId = 1;
+  string userId = 2;
+  string workspaceId = 3;
+  string containerId = 4;
+  string status = 5;
+  string createdAt = 6;
+  int32 cols = 7;
+  int32 rows = 8;
+}
+
+message SessionResponse {
+  bool success = 1;
+  string message = 2;
+  TerminalSession session = 3;
+  string websocketUrl = 4;
+}
+
+message ExecuteCommandRequest {
+  string userId = 1;
+  string sessionId = 2;
+  string command = 3;
+  int32 timeout = 4;
+}
+
+message ExecuteResponse {
+  bool success = 1;
+  string message = 2;
+  string output = 3;
+  int32 exitCode = 4;
+}
+
+message GetActiveSessionsRequest {
+  string userId = 1;
+}
+
+message SessionsListResponse {
+  bool success = 1;
+  string message = 2;
+  repeated TerminalSession sessions = 3;
+}
+
+message KillSessionRequest {
+  string userId = 1;
+  string sessionId = 2;
+}
+
+message ResizeTerminalRequest {
+  string sessionId = 1;
+  int32 cols = 2;
+  int32 rows = 3;
+}
+
+message OperationResponse {
+  bool success = 1;
+  string message = 2;
+}

@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package user;
+
+service UserService {
+  rpc GetProfile(GetProfileRequest) returns (ProfileResponse);
+  rpc UpdateProfile(UpdateProfileRequest) returns (ProfileResponse);
+  rpc GetUserById(GetUserByIdRequest) returns (UserResponse);
+  rpc GetAllUsers(GetAllUsersRequest) returns (UserListResponse);
+  rpc DeactivateUser(DeactivateUserRequest) returns (OperationResponse);
+  rpc ActivateUser(ActivateUserRequest) returns (OperationResponse);
+  rpc UpdateRoles(UpdateRolesRequest) returns (OperationResponse);
+  rpc GetUserStats(GetUserStatsRequest) returns (UserStatsResponse);
+}
+
+message GetProfileRequest {
+  string userId = 1;
+}
+
+message Profile {
+  string userId = 1;
+  string firstName = 2;
+  string lastName = 3;
+  string bio = 4;
+  string avatar = 5;
+  ProfilePreferences preferences = 6;
+  string updatedAt = 7;
+}
+
+message ProfilePreferences {
+  string theme = 1;
+  string language = 2;
+}
+
+message ProfileResponse {
+  bool success = 1;
+  string message = 2;
+  Profile profile = 3;
+}
+
+message UpdateProfileRequest {
+  string userId = 1;
+  string firstName = 2;
+  string lastName = 3;
+  string bio = 4;
+  string avatar = 5;
+  ProfilePreferences preferences = 6;
+}
+
+message GetUserByIdRequest {
+  string userId = 1;
+}
+
+message User {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  string role = 4;
+  bool isActive = 5;
+  string lastLogin = 6;
+  string createdAt = 7;
+}
+
+message UserResponse {
+  bool success = 1;
+  string message = 2;
+  User user = 3;
+}
+
+message GetAllUsersRequest {
+  int32 page = 1;
+  int32 limit = 2;
+  string search = 3;
+  string role = 4;
+  bool isActive = 5;
+}
+
+message UserListResponse {
+  bool success = 1;
+  string message = 2;
+  repeated User users = 3;
+  int32 total = 4;
+  int32 page = 5;
+  int32 totalPages = 6;
+}
+
+message DeactivateUserRequest {
+  string userId = 1;
+  string adminId = 2;
+}
+
+message ActivateUserRequest {
+  string userId = 1;
+  string adminId = 2;
+}
+
+message UpdateRolesRequest {
+  string userId = 1;
+  repeated string roles = 2;
+  string adminId = 3;
+}
+
+message OperationResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetUserStatsRequest {
+  string adminId = 1;
+}
+
+message UserStatsResponse {
+  bool success = 1;
+  string message = 2;
+  int32 totalUsers = 3;
+  int32 activeUsers = 4;
+  int32 inactiveUsers = 5;
+  int32 admins = 6;
+  int32 publishers = 7;
+  int32 students = 8;
+}

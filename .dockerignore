@@ -1,0 +1,10 @@
+node_modules
+.git
+.agent
+frontend/node_modules
+services/*/node_modules
+services/*/dist
+frontend/dist
+.vscode
+.idea
+*.log

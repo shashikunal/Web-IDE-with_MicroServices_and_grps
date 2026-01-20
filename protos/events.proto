@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package events;
+
+message UserEvent {
+  string eventId = 1;
+  string eventType = 2;
+  string userId = 3;
+  string email = 4;
+  string username = 5;
+  string role = 6;
+  string timestamp = 7;
+  map<string, string> metadata = 8;
+}
+
+message WorkspaceEvent {
+  string eventId = 1;
+  string eventType = 2;
+  string userId = 3;
+  string workspaceId = 4;
+  string templateId = 5;
+  string containerId = 6;
+  string timestamp = 7;
+  map<string, string> metadata = 8;
+}
+
+message ContainerEvent {
+  string eventId = 1;
+  string eventType = 2;
+  string userId = 3;
+  string workspaceId = 4;
+  string containerId = 5;
+  string status = 6;
+  string timestamp = 7;
+  map<string, string> metadata = 8;
+}
+
+message ApiTestEvent {
+  string eventId = 1;
+  string eventType = 2;
+  string userId = 3;
+  string workspaceId = 4;
+  string method = 5;
+  string url = 6;
+  int32 status = 7;
+  int64 duration = 8;
+  string timestamp = 9;
+  map<string, string> metadata = 10;
+}
+
+message AuthEvent {
+  string eventId = 1;
+  string eventType = 2;
+  string userId = 3;
+  string email = 4;
+  string ipAddress = 5;
+  string userAgent = 6;
+  bool success = 7;
+  string timestamp = 8;
+  map<string, string> metadata = 9;
+}
+
+service EventService {
+  rpc PublishEvent(PublishEventRequest) returns (PublishEventResponse);
+  rpc SubscribeToEvents(SubscribeRequest) returns (stream EventResponse);
+}
+
+message PublishEventRequest {
+  string eventType = 1;
+  oneof event {
+    UserEvent userEvent = 2;
+    WorkspaceEvent workspaceEvent = 3;
+    ContainerEvent containerEvent = 4;
+    ApiTestEvent apiTestEvent = 5;
+    AuthEvent authEvent = 6;
+  }
+}
+
+message PublishEventResponse {
+  bool success = 1;
+  string message = 2;
+  string eventId = 3;
+}
+
+message SubscribeRequest {
+  repeated string eventTypes = 1;
+  string queueName = 2;
+}
+
+message EventResponse {
+  string eventId = 1;
+  string eventType = 2;
+  oneof event {
+    UserEvent userEvent = 3;
+    WorkspaceEvent workspaceEvent = 4;
+    ContainerEvent containerEvent = 5;
+    ApiTestEvent apiTestEvent = 6;
+    AuthEvent authEvent = 7;
+  }
+}

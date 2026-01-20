@@ -1,0 +1,24 @@
+{
+  "name": "@coding-platform/common",
+  "version": "1.0.0",
+  "description": "Common utilities for coding platform microservices",
+  "main": "src/index.js",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./config": "./src/config/index.js",
+    "./redis": "./src/redis/index.js",
+    "./rabbitmq": "./src/rabbitmq/index.js",
+    "./grpc": "./src/grpc/index.js",
+    "./errors": "./src/errors/index.js",
+    "./logger": "./src/logger/index.js"
+  },
+  "dependencies": {
+    "ioredis": "^5.4.1",
+    "amqplib": "^0.10.4",
+    "@grpc/grpc-js": "^1.10.0",
+    "@grpc/proto-loader": "^0.7.13",
+    "winston": "^3.13.0",
+    "uuid": "^9.0.1"
+  }
+}

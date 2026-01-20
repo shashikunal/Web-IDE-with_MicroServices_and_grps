@@ -1,0 +1,27 @@
+{
+  "name": "coding-platform-microservices",
+  "version": "1.0.0",
+  "description": "Code Playground Platform with Microservices Architecture",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run services\" \"npm run client\"",
+    "services": "concurrently \"npm run gateway\" \"npm run auth\" \"npm run user\" \"npm run workspace\" \"npm run snippet\" \"npm run apitest\" \"npm run terminal\" \"npm run admin\"",
+    "gateway": "cd services/gateway && npm run dev",
+    "auth": "cd services/auth-service && npm run dev",
+    "user": "cd services/user-service && npm run dev",
+    "workspace": "cd services/workspace-service && npm run dev",
+    "snippet": "cd services/snippet-service && npm run dev",
+    "apitest": "cd services/api-test-service && npm run dev",
+    "terminal": "cd services/terminal-service && npm run dev",
+    "admin": "cd services/admin-service && npm run dev",
+    "client": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "install:all": "npm install && cd services/common && npm install && cd ../gateway && npm install && cd ../auth-service && npm install && cd ../user-service && npm install && cd ../workspace-service && npm install && cd ../snippet-service && npm install && cd ../api-test-service && npm install && cd ../terminal-service && npm install && cd ../admin-service && npm install && cd ../../frontend && npm install",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

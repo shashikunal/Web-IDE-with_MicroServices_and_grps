@@ -1,0 +1,257 @@
+import express from 'express';
+import grpc from '@grpc/grpc-js';
+import { WebSocketServer } from 'ws';
+import pty from 'node-pty';
+import { v4 as uuidv4 } from 'uuid';
+import Docker from 'dockerode';
+import { config, redisClient, grpcHelper, logger } from '../../common/src/index.js';
+import terminalProto from './proto/terminal.js';
+
+const app = express();
+const PORT = config.services.terminal.port;
+const GRPC_PORT = config.grpc.ports.terminal;
+const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+
+app.use(express.json());
+
+const sessions = new Map();
+
+app.post('/session', (req, res) => {
+  const { userId, workspaceId, containerId, cols = 80, rows = 24 } = req.body;
+  const sessionId = uuidv4();
+  sessions.set(sessionId, { userId, workspaceId, containerId, cols, rows, exec: null, status: 'created' });
+  res.json({ success: true, sessionId, websocketUrl: `ws://localhost:${PORT}/ws/${sessionId}` });
+});
+
+app.get('/sessions/:userId', (req, res) => {
+  const userSessions = [];
+  for (const [sessionId, session] of sessions) {
+    if (session.userId === req.params.userId) {
+      userSessions.push({ sessionId, ...session, exec: undefined });
+    }
+  }
+  res.json({ success: true, sessions: userSessions });
+});
+
+app.delete('/sessions/:sessionId', (req, res) => {
+  const session = sessions.get(req.params.sessionId);
+  if (session) {
+    sessions.delete(req.params.sessionId);
+    res.json({ success: true, message: 'Session killed' });
+  } else {
+    res.status(404).json({ success: false, message: 'Session not found' });
+  }
+});
+
+// WebSocket setup for docker exec terminals
+const setupWebSocket = (server) => {
+  const wss = new WebSocketServer({ server });
+
+  wss.on('connection', async (ws, req) => {
+    const url = new URL(req.url, `http://localhost:${PORT + 1}`);
+    const sessionId = url.pathname.split('/').pop();
+
+    // Extract containerId from query params
+    const containerId = url.searchParams.get('containerId');
+
+    let session = sessions.get(sessionId);
+
+    // Update containerId if provided
+    if (session && containerId) {
+      session.containerId = containerId;
+    }
+
+    // Auto-create session if it doesn't exist
+    if (!session) {
+      logger.info(`Auto-creating session for ${sessionId}, container: ${containerId}`);
+      session = {
+        userId: 'auto',
+        workspaceId: 'auto',
+        containerId: containerId || null,
+        cols: 80,
+        rows: 24,
+        exec: null,
+        status: 'created'
+      };
+      sessions.set(sessionId, session);
+    }
+
+    session.status = 'connected';
+    session.ws = ws;
+
+    if (!session.containerId) {
+      logger.error(`No container ID for session ${sessionId}`);
+      ws.send('\r\n\x1b[1;31mError: No container specified\x1b[0m\r\n');
+      ws.close();
+      return;
+    }
+
+    try {
+      const container = docker.getContainer(session.containerId);
+
+      // Create exec instance for interactive shell
+      const exec = await container.exec({
+        Cmd: ['/bin/sh'],
+        AttachStdin: true,
+        AttachStdout: true,
+        AttachStderr: true,
+        Tty: true,
+        WorkingDir: '/workspace',
+        Env: ['TERM=xterm', 'COLORTERM=truecolor']
+      });
+
+      const stream = await exec.start({
+        hijack: true,
+        stdin: true,
+        Tty: true
+      });
+
+      session.exec = exec;
+      session.stream = stream;
+
+      // Send data from container to WebSocket
+      stream.on('data', (data) => {
+        if (ws.readyState === ws.OPEN) {
+          ws.send(data);
+        }
+      });
+
+      // Send data from WebSocket to container
+      ws.on('message', (message) => {
+        try {
+          // Try to parse as JSON for resize commands
+          const msg = JSON.parse(message);
+          if (msg.type === 'resize') {
+            exec.resize({ h: msg.rows, w: msg.cols }).catch(err => {
+              logger.error('Resize error:', err);
+            });
+          }
+        } catch (e) {
+          // If not JSON, treat as raw terminal input
+          if (stream && stream.writable) {
+            stream.write(message.toString());
+          }
+        }
+      });
+
+      ws.on('close', () => {
+        logger.info(`WebSocket closed for session ${sessionId}`);
+        if (stream) {
+          stream.end();
+        }
+        sessions.delete(sessionId);
+      });
+
+      stream.on('end', () => {
+        logger.info(`Container stream ended for session ${sessionId}`);
+        ws.close();
+      });
+
+      logger.info(`Terminal session ${sessionId} connected to container ${session.containerId}`);
+
+    } catch (error) {
+      logger.error('Failed to start docker exec:', error);
+      ws.send(`\r\n\x1b[1;31mError: ${error.message}\x1b[0m\r\n`);
+      ws.close(1011, 'Failed to start terminal');
+    }
+  });
+};
+
+const terminalServiceImpl = {
+  CreateSession: async (call, callback) => {
+    try {
+      const { userId, workspaceId, containerId, cols = 80, rows = 24 } = call.request;
+      const sessionId = uuidv4();
+      sessions.set(sessionId, { userId, workspaceId, containerId, cols, rows, exec: null, status: 'created' });
+      callback(null, {
+        success: true,
+        session: { sessionId, userId, workspaceId, status: 'created', cols, rows },
+        websocketUrl: `ws://localhost:${PORT}/ws/${sessionId}`
+      });
+    } catch (error) {
+      callback(null, { success: false, message: error.message });
+    }
+  },
+  ExecuteCommand: async (call, callback) => {
+    try {
+      const { userId, sessionId, command, timeout = 10000 } = call.request;
+      const session = sessions.get(sessionId);
+      if (!session || session.userId !== userId) {
+        return callback(null, { success: false, message: 'Session not found' });
+      }
+
+      callback(null, { success: false, message: 'Use WebSocket for command execution' });
+    } catch (error) {
+      callback(null, { success: false, message: error.message });
+    }
+  },
+  GetActiveSessions: async (call, callback) => {
+    try {
+      const { userId } = call.request;
+      const userSessions = [];
+      for (const [sessionId, session] of sessions) {
+        if (session.userId === userId) {
+          userSessions.push({ sessionId, userId, workspaceId: session.workspaceId, status: session.status, cols: session.cols, rows: session.rows });
+        }
+      }
+      callback(null, { success: true, sessions: userSessions });
+    } catch (error) {
+      callback(null, { success: false, message: error.message });
+    }
+  },
+  KillSession: async (call, callback) => {
+    try {
+      const { userId, sessionId } = call.request;
+      const session = sessions.get(sessionId);
+      if (!session || session.userId !== userId) {
+        return callback(null, { success: false, message: 'Session not found' });
+      }
+      if (session.stream) {
+        session.stream.end();
+      }
+      sessions.delete(sessionId);
+      callback(null, { success: true, message: 'Session killed' });
+    } catch (error) {
+      callback(null, { success: false, message: error.message });
+    }
+  },
+  ResizeTerminal: async (call, callback) => {
+    try {
+      const { sessionId, cols, rows } = call.request;
+      const session = sessions.get(sessionId);
+      if (session && session.exec) {
+        await session.exec.resize({ h: rows, w: cols });
+        callback(null, { success: true, message: 'Terminal resized' });
+      } else {
+        callback(null, { success: false, message: 'Session not found' });
+      }
+    } catch (error) {
+      callback(null, { success: false, message: error.message });
+    }
+  }
+};
+
+async function startServer() {
+  try {
+    await redisClient.connect();
+    const server = app.listen(PORT, '0.0.0.0', () => logger.info(`Terminal HTTP & WS running on ${PORT}`));
+    setupWebSocket(server);
+    const grpcServer = await grpcHelper.createServer(GRPC_PORT);
+    grpcHelper.addServiceToServer(grpcServer, terminalProto, 'TerminalService', terminalServiceImpl);
+    await grpcHelper.startServer(grpcServer);
+    logger.info(`Terminal gRPC running on ${GRPC_PORT}`);
+  } catch (error) {
+    logger.error('Failed to start Terminal Service:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
+process.on('SIGTERM', async () => {
+  for (const session of sessions.values()) {
+    if (session.stream) session.stream.end();
+  }
+  await redisClient.close();
+  process.exit(0);
+});
+export default app;

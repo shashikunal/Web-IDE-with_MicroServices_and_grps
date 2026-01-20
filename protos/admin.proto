@@ -1,0 +1,143 @@
+syntax = "proto3";
+
+package admin;
+
+service AdminService {
+  rpc GetAllUsers(GetAllUsersRequest) returns (UserListResponse);
+  rpc GetUserDetails(GetUserDetailsRequest) returns (UserResponse);
+  rpc UpdateUserRoles(UpdateUserRolesRequest) returns (OperationResponse);
+  rpc DeactivateUser(DeactivateUserRequest) returns (OperationResponse);
+  rpc ActivateUser(ActivateUserRequest) returns (OperationResponse);
+  rpc BulkUpdateRoles(BulkUpdateRolesRequest) returns (OperationResponse);
+  rpc GetSystemStats(GetSystemStatsRequest) returns (SystemStatsResponse);
+  rpc GetDashboardStats(GetDashboardStatsRequest) returns (DashboardStatsResponse);
+}
+
+message GetAllUsersRequest {
+  string adminId = 1;
+  int32 page = 2;
+  int32 limit = 3;
+  string search = 4;
+  string role = 5;
+  bool isActive = 6;
+}
+
+message User {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  string role = 4;
+  bool isActive = 5;
+  string lastLogin = 6;
+  string createdAt = 7;
+  Profile profile = 8;
+}
+
+message Profile {
+  string firstName = 1;
+  string lastName = 2;
+  string avatar = 3;
+}
+
+message UserListResponse {
+  bool success = 1;
+  string message = 2;
+  repeated User users = 3;
+  int32 total = 4;
+  int32 page = 5;
+  int32 totalPages = 6;
+}
+
+message GetUserDetailsRequest {
+  string adminId = 1;
+  string userId = 2;
+}
+
+message UserResponse {
+  bool success = 1;
+  string message = 2;
+  User user = 3;
+}
+
+message UpdateUserRolesRequest {
+  string adminId = 1;
+  string userId = 2;
+  repeated string roles = 3;
+}
+
+message DeactivateUserRequest {
+  string adminId = 1;
+  string userId = 2;
+  string reason = 3;
+}
+
+message ActivateUserRequest {
+  string adminId = 1;
+  string userId = 2;
+}
+
+message BulkUpdateRolesRequest {
+  string adminId = 1;
+  repeated string userIds = 2;
+  repeated string roles = 3;
+}
+
+message OperationResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetSystemStatsRequest {
+  string adminId = 1;
+}
+
+message SystemStats {
+  int32 totalUsers = 1;
+  int32 activeUsers = 2;
+  int32 totalWorkspaces = 3;
+  int32 activeContainers = 4;
+  int32 totalSnippets = 5;
+  int32 totalRequests = 6;
+  double cpuUsage = 7;
+  double memoryUsage = 8;
+  double diskUsage = 9;
+}
+
+message SystemStatsResponse {
+  bool success = 1;
+  string message = 2;
+  SystemStats stats = 3;
+}
+
+message GetDashboardStatsRequest {
+  string adminId = 1;
+  string period = 2;
+}
+
+message DashboardStats {
+  int32 newUsers = 1;
+  int32 activeSessions = 2;
+  int32 requestsToday = 3;
+  double avgResponseTime = 4;
+  repeated DailyStat dailyStats = 5;
+  repeated TopUser topUsers = 6;
+}
+
+message DailyStat {
+  string date = 1;
+  int32 users = 2;
+  int32 requests = 3;
+  int32 workspaces = 4;
+}
+
+message TopUser {
+  string userId = 1;
+  string username = 2;
+  int32 workspaceCount = 3;
+}
+
+message DashboardStatsResponse {
+  bool success = 1;
+  string message = 2;
+  DashboardStats stats = 3;
+}

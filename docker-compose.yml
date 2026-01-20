@@ -1,0 +1,198 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+
+  auth-service:
+    restart: always
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+      - MONGODB_HOST=mongodb
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+
+  user-service:
+    restart: always
+    build:
+      context: .
+      dockerfile: services/user-service/Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+      - MONGODB_HOST=mongodb
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+
+  workspace-service:
+    restart: always
+    build:
+      context: .
+      dockerfile: services/workspace-service/Dockerfile
+    ports:
+      - "3003:3003"
+    environment:
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+      - MONGODB_HOST=mongodb
+      - HOST_WORKSPACES_PATH=${HOST_WORKSPACES_PATH}
+    volumes:
+      - //var/run/docker.sock:/var/run/docker.sock
+      - ./workspaces:/app/workspaces
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+
+  snippet-service:
+    build:
+      context: .
+      dockerfile: services/snippet-service/Dockerfile
+    ports:
+      - "3004:3004"
+    environment:
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+      - MONGODB_HOST=mongodb
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+
+  api-test-service:
+    build:
+      context: .
+      dockerfile: services/api-test-service/Dockerfile
+    ports:
+      - "3005:3005"
+    environment:
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+      - MONGODB_HOST=mongodb
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+
+  terminal-service:
+    restart: always
+    build:
+      context: .
+      dockerfile: services/terminal-service/Dockerfile
+    ports:
+      - "3006:3006"
+    environment:
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+      - MONGODB_HOST=mongodb
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+
+  admin-service:
+    build:
+      context: .
+      dockerfile: services/admin-service/Dockerfile
+    ports:
+      - "3008:3008"
+    environment:
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+      - MONGODB_HOST=mongodb
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+
+  gateway:
+    restart: always
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+      - AUTH_HOST=auth-service
+      - AUTH_PORT=3001
+      - USER_HOST=user-service
+      - USER_PORT=3002
+      - WORKSPACE_HOST=workspace-service
+      - WORKSPACE_PORT=3003
+      - SNIPPET_HOST=snippet-service
+      - SNIPPET_PORT=3004
+      - APITEST_HOST=api-test-service
+      - APITEST_PORT=3005
+      - TERMINAL_HOST=terminal-service
+      - TERMINAL_PORT=3006
+      - ADMIN_HOST=admin-service
+      - ADMIN_PORT=3008
+      - GATEWAY_PORT=3000
+    depends_on:
+      - auth-service
+      - user-service
+      - workspace-service
+      - snippet-service
+      - api-test-service
+      - terminal-service
+      - admin-service
+      - redis
+      - rabbitmq
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5174:5173"
+    environment:
+      - VITE_API_URL=http://localhost:3000
+      - VITE_WS_URL=ws://localhost:3000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - gateway
+
+volumes:
+  mongodb_data:
+  redis_data:
+  rabbitmq_data:
