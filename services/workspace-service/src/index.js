@@ -401,10 +401,8 @@ app.post('/workspace/:workspaceId/start', asyncHandler(async (req, res) => {
         workspace.status = 'running';
         await workspace.save();
       } else if (error.statusCode === 404) {
-        // Container might be gone, try to recreate? 
-        // For now, let's just create a new one if it's missing
+        // Container might be gone, try to recreate
         try {
-             // We need to re-create it using the logic from createContainer
              const result = await createContainer(userId, workspaceId, workspace.templateId);
              workspace.containerId = result.containerId;
              workspace.publicPort = result.publicPort;
@@ -418,19 +416,155 @@ app.post('/workspace/:workspaceId/start', asyncHandler(async (req, res) => {
       }
     }
   } else {
-      // No container ID, create one
-      try {
-           const result = await createContainer(userId, workspaceId, workspace.templateId);
-           workspace.containerId = result.containerId;
-           workspace.publicPort = result.publicPort;
-           workspace.status = 'running';
-           await workspace.save();
-      } catch(createErr) {
-           throw createErr;
-      }
+    // No container ID, create one
+    try {
+         const result = await createContainer(userId, workspaceId, workspace.templateId);
+         workspace.containerId = result.containerId;
+         workspace.publicPort = result.publicPort;
+         workspace.status = 'running';
+         await workspace.save();
+    } catch(createErr) {
+         throw createErr;
+    }
   }
 
   res.json({ success: true, message: 'Workspace started', status: 'running', publicPort: workspace.publicPort });
+}));
+
+// Ensure container is running - check status and start if needed
+app.post('/workspace/:workspaceId/ensure-running', asyncHandler(async (req, res) => {
+  const { workspaceId } = req.params;
+  const { userId } = req.body;
+
+  const workspace = await Workspace.findOne({ workspaceId, userId });
+  if (!workspace) {
+    return res.status(404).json({ success: false, message: 'Workspace not found' });
+  }
+
+  if (!workspace.containerId || !docker) {
+    // No container, create one
+    try {
+      const result = await createContainer(userId, workspaceId, workspace.templateId);
+      workspace.containerId = result.containerId;
+      workspace.publicPort = result.publicPort;
+      workspace.status = 'running';
+      await workspace.save();
+      return res.json({
+        success: true,
+        message: 'Container created and started',
+        status: 'running',
+        containerId: workspace.containerId,
+        publicPort: workspace.publicPort
+      });
+    } catch(createErr) {
+      logger.error('Failed to create container:', createErr);
+      return res.status(500).json({ success: false, message: `Failed to create container: ${createErr.message}` });
+    }
+  }
+
+  // Check container status
+  try {
+    const container = docker.getContainer(workspace.containerId);
+    const containerInfo = await container.inspect();
+
+    const isRunning = containerInfo.State.Running;
+    const isPaused = containerInfo.State.Paused;
+    
+    // Get the actual port mapping from Docker
+    const template = templateConfigs[workspace.templateId];
+    let actualPublicPort = workspace.publicPort; // Default to stored value
+    
+    if (template && template.port) {
+      const portKey = `${template.port}/tcp`;
+      const bindings = containerInfo.NetworkSettings.Ports[portKey];
+      if (bindings && bindings.length > 0) {
+        actualPublicPort = parseInt(bindings[0].HostPort, 10);
+        // Update the database if the port has changed
+        if (actualPublicPort !== workspace.publicPort) {
+          logger.info(`Updating publicPort from ${workspace.publicPort} to ${actualPublicPort} for workspace ${workspaceId}`);
+          workspace.publicPort = actualPublicPort;
+        }
+      }
+    }
+
+    if (isPaused) {
+      // Unpause the container
+      await container.unpause();
+      workspace.status = 'running';
+      await workspace.save();
+      logger.info(`Container ${workspace.containerId} unpaused`);
+      return res.json({
+        success: true,
+        message: 'Container unpaused',
+        status: 'running',
+        containerId: workspace.containerId,
+        publicPort: workspace.publicPort
+      });
+    }
+
+    if (!isRunning) {
+      // Start the container
+      await container.start();
+      workspace.status = 'running';
+      await workspace.save();
+      logger.info(`Container ${workspace.containerId} started`);
+      return res.json({
+        success: true,
+        message: 'Container started',
+        status: 'running',
+        containerId: workspace.containerId,
+        publicPort: workspace.publicPort 
+      });
+    }
+    
+    // Container is already running - save any port updates
+    workspace.status = 'running';
+    await workspace.save();
+    return res.json({ 
+      success: true, 
+      message: 'Container already running', 
+      status: 'running',
+      containerId: workspace.containerId,
+      publicPort: workspace.publicPort 
+    });
+    
+  } catch (error) {
+    if (error.statusCode === 404) {
+      // Container doesn't exist, create a new one
+      logger.warn(`Container ${workspace.containerId} not found, creating new one`);
+      try {
+        const result = await createContainer(userId, workspaceId, workspace.templateId);
+        workspace.containerId = result.containerId;
+        workspace.publicPort = result.publicPort;
+        workspace.status = 'running';
+        await workspace.save();
+        return res.json({ 
+          success: true, 
+          message: 'Container recreated and started', 
+          status: 'running',
+          containerId: workspace.containerId,
+          publicPort: workspace.publicPort 
+        });
+      } catch(createErr) {
+        logger.error('Failed to recreate container:', createErr);
+        return res.status(500).json({ success: false, message: `Failed to recreate container: ${createErr.message}` });
+      }
+    } else if (error.statusCode === 304) {
+      // Container already started
+      workspace.status = 'running';
+      await workspace.save();
+      return res.json({ 
+        success: true, 
+        message: 'Container already running', 
+        status: 'running',
+        containerId: workspace.containerId,
+        publicPort: workspace.publicPort 
+      });
+    } else {
+      logger.error('Error checking container status:', error);
+      return res.status(500).json({ success: false, message: `Error checking container: ${error.message}` });
+    }
+  }
 }));
 
 app.post('/workspace/:workspaceId/files', asyncHandler(async (req, res) => {

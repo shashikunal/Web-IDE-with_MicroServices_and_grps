@@ -117,7 +117,7 @@ function AppContent() {
     navigate('/error');
   };
 
-  const handleWorkspaceSelect = (workspace: Workspace) => {
+  const handleWorkspaceSelect = async (workspace: Workspace) => {
     // Convert workspace to template format
     const template: Template = {
       id: workspace.templateId,
@@ -129,14 +129,52 @@ function AppContent() {
       color: '#007acc'
     };
 
-    setWorkspaceInfo({
-      userId: workspace.userId,
-      publicPort: workspace.publicPort,
-      workspaceId: workspace.workspaceId,
-      containerId: workspace.containerId,
-      template
-    });
-    navigate(`/workspace?userId=${workspace.userId}&port=${workspace.publicPort}&workspaceId=${workspace.workspaceId}&containerId=${workspace.containerId}&template=${workspace.templateId}`);
+    try {
+      // Ensure container is running before opening workspace
+      const response = await fetch(`/api/workspaces/${workspace.workspaceId}/ensure-running`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Use the updated container info from the response
+        setWorkspaceInfo({
+          userId: workspace.userId,
+          publicPort: data.publicPort || workspace.publicPort,
+          workspaceId: workspace.workspaceId,
+          containerId: data.containerId || workspace.containerId,
+          template
+        });
+        navigate(`/workspace?userId=${workspace.userId}&port=${data.publicPort || workspace.publicPort}&workspaceId=${workspace.workspaceId}&containerId=${data.containerId || workspace.containerId}&template=${workspace.templateId}`);
+      } else {
+        console.error('Failed to ensure container is running:', data.message);
+        // Fall back to original behavior
+        setWorkspaceInfo({
+          userId: workspace.userId,
+          publicPort: workspace.publicPort,
+          workspaceId: workspace.workspaceId,
+          containerId: workspace.containerId,
+          template
+        });
+        navigate(`/workspace?userId=${workspace.userId}&port=${workspace.publicPort}&workspaceId=${workspace.workspaceId}&containerId=${workspace.containerId}&template=${workspace.templateId}`);
+      }
+    } catch (error) {
+      console.error('Error ensuring container is running:', error);
+      // Fall back to original behavior
+      setWorkspaceInfo({
+        userId: workspace.userId,
+        publicPort: workspace.publicPort,
+        workspaceId: workspace.workspaceId,
+        containerId: workspace.containerId,
+        template
+      });
+      navigate(`/workspace?userId=${workspace.userId}&port=${workspace.publicPort}&workspaceId=${workspace.workspaceId}&containerId=${workspace.containerId}&template=${workspace.templateId}`);
+    }
   };
 
   const handleBackToTemplates = () => {

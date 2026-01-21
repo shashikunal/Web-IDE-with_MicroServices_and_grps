@@ -124,6 +124,26 @@ router.post('/:workspaceId/start', asyncHandler(async (req, res) => {
   res.status(response.status).json(data);
 }));
 
+router.post('/:workspaceId/ensure-running', asyncHandler(async (req, res) => {
+  const { workspaceId } = req.params;
+  
+  const response = await fetch(`${workspaceServiceUrl}/workspace/${workspaceId}/ensure-running`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId: req.user.userId })
+  });
+
+  const data = await response.json();
+  
+  // If container was started/created, invalidate cache
+  if (data.success) {
+    await redisClient.delete(`workspaces:${req.user.userId}:list`);
+    await redisClient.deletePattern(`workspace:${req.user.userId}:${workspaceId}:*`);
+  }
+  
+  res.status(response.status).json(data);
+}));
+
 router.get('/:workspaceId/files', asyncHandler(async (req, res) => {
   const { workspaceId } = req.params;
   const { path = '.' } = req.query;
