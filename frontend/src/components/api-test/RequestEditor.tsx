@@ -21,6 +21,7 @@ interface RequestEditorProps {
     request: any;
     onChange: (req: any) => void;
     onRun: () => void;
+    onSave?: () => void;
     isLoading?: boolean;
     environments: Environment[];
     activeEnvId: string | null;
@@ -127,7 +128,7 @@ const KeyValueEditor = ({ items, onChange, type = 'params' }: { items: KeyValueI
     );
 };
 
-export default function RequestEditor({ request, onChange, onRun, isLoading, environments, activeEnvId, onEnvChange }: RequestEditorProps) {
+export default function RequestEditor({ request, onChange, onRun, onSave, isLoading, environments, activeEnvId, onEnvChange }: RequestEditorProps) {
     const [activeTab, setActiveTab] = useState<'params' | 'auth' | 'headers' | 'body' | 'tests'>('body');
 
     const updateField = (field: string, value: any) => {
@@ -180,6 +181,16 @@ export default function RequestEditor({ request, onChange, onRun, isLoading, env
                 >
                     {isLoading ? 'Running...' : 'Send'}
                 </button>
+
+                {onSave && request._id && (
+                    <button
+                        onClick={onSave}
+                        className="bg-[#28a745] hover:bg-[#218838] text-white px-6 py-1.5 rounded text-sm font-semibold transition-colors flex items-center gap-2 shadow-sm"
+                        title="Save changes to this request"
+                    >
+                        Save
+                    </button>
+                )}
             </div>
 
             {/* Env Toolbar */}
@@ -199,12 +210,12 @@ export default function RequestEditor({ request, onChange, onRun, isLoading, env
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-[#3e3e42] bg-[#252526]">
+            <div className="flex flex-wrap overflow-x-auto border-b border-[#3e3e42] bg-[#252526]">
                 {['Params', 'Auth', 'Headers', 'Body', 'Tests'].map(tab => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab.toLowerCase() as any)}
-                        className={`px-4 py-2 text-xs font-semibold uppercase tracking-wide border-b-2 transition-colors ${activeTab === tab.toLowerCase()
+                        className={`px-3 py-2 text-xs font-semibold uppercase tracking-wide border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.toLowerCase()
                             ? 'border-[#f14c4c] text-white bg-[#1e1e1e]' // Postman-like orange/red highlight often used, or blue
                             : 'border-transparent text-gray-400 hover:text-white hover:bg-[#2d2d2d]'
                             }`}
@@ -234,9 +245,9 @@ export default function RequestEditor({ request, onChange, onRun, isLoading, env
                 {/* BODY */}
                 {activeTab === 'body' && (
                     <div className="flex flex-col h-full">
-                        <div className="flex items-center gap-4 mb-4 text-xs">
+                        <div className="flex flex-wrap items-center gap-6 mb-4 text-xs">
                             {['none', 'form-data', 'x-www-form-urlencoded', 'json', 'raw'].map(type => (
-                                <label key={type} className="flex items-center gap-1.5 cursor-pointer text-gray-300 hover:text-white">
+                                <label key={type} className="flex items-center gap-1.5 cursor-pointer text-gray-300 hover:text-white whitespace-nowrap">
                                     <input
                                         type="radio"
                                         name="bodyType"

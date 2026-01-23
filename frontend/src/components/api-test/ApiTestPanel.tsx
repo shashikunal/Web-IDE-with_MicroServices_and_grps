@@ -44,30 +44,36 @@ export default function ApiTestPanel() {
     const [environments, setEnvironments] = useState<Environment[]>([]);
     const [activeEnvId, setActiveEnvId] = useState<string | null>(null);
 
-    const workspaceId = new URLSearchParams(window.location.search).get('userId') || 'guest';
-    // NOTE: 'userId' query param is actually the workspace unique identifier in this app's context
-    // In many places it's referred to as 'userId' for the workspace route, but it maps to 'workspaceId' in DB.
+    // Get auth token for API calls
+    const getAuthHeaders = () => {
+        const token = localStorage.getItem('accessToken');
+        return {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
+    };
 
     useEffect(() => {
         loadData();
-    }, [workspaceId]);
+    }, []);
 
     const loadData = async () => {
-        if (!workspaceId) return;
         try {
+            const headers = getAuthHeaders();
+
             const [colRes, histRes, envRes] = await Promise.all([
-                axios.get(`http://localhost:3000/api/apitest/collections?workspaceId=${workspaceId}`),
-                axios.get(`http://localhost:3000/api/apitest/history?workspaceId=${workspaceId}`),
-                axios.get(`http://localhost:3000/api/apitest/environments?workspaceId=${workspaceId}`)
+                axios.get('http://localhost:3000/api/apitest/collections', { headers }),
+                axios.get('http://localhost:3000/api/apitest/history', { headers }),
+                axios.get('http://localhost:3000/api/apitest/environments', { headers })
             ]);
 
             setCollections(colRes.data.collections || []);
             setRequests(colRes.data.requests || []);
-            setHistoryItems(histRes.data || []);
+            setHistoryItems(histRes.data.history || []);
 
-            const envs = envRes.data || [];
+            const envs = envRes.data.environments || [];
             if (envs.length === 0) {
-                // Create default if none exists? Or just local default
+                // Create default environment
                 const defaultEnv = { id: 'default', name: 'Global', variables: { baseUrl: 'http://localhost:3000' } };
                 setEnvironments([defaultEnv]);
                 setActiveEnvId('default');
@@ -173,7 +179,6 @@ export default function ApiTestPanel() {
 
             // Add to history (Backend)
             const historyEntry = {
-                workspaceId,
                 method: activeRequest.method,
                 url: finalUrl,
                 status: res.status,
@@ -184,7 +189,12 @@ export default function ApiTestPanel() {
             // Optimistic update
             setHistoryItems(prev => [{ ...historyEntry, _id: generateUUID() } as any, ...prev].slice(0, 50));
             // Save to DB
-            await axios.post('http://localhost:3000/api/apitest/history', historyEntry);
+            try {
+                const headers = getAuthHeaders();
+                await axios.post('http://localhost:3000/api/apitest/history', historyEntry, { headers });
+            } catch (histErr) {
+                console.error('Failed to save history:', histErr);
+            }
 
         } catch (err: any) {
             setResponse({
@@ -199,73 +209,86 @@ export default function ApiTestPanel() {
 
     const handleCreateCollection = async (name: string) => {
         try {
-            const res = await axios.post('http://localhost:3000/api/apitest/collections', {
-                workspaceId,
-                name,
-                parentId: null
-            });
-            setCollections([...collections, res.data]);
+            const headers = getAuthHeaders();
+            const res = await axios.post(
+                'http://localhost:3000/api/apitest/collections',
+                { name, parentId: null },
+                { headers }
+            );
+            setCollections([...collections, res.data.collection]);
         } catch (e) {
-            console.error(e);
+            console.error('Failed to create collection:', e);
         }
     };
 
     const handleCreateRequest = async (collectionId: string) => {
         const newReq = {
-            workspaceId,
             collectionId,
             name: 'New Request',
             method: 'GET',
+            url: '',
             headers: [],
             bodyType: 'json',
             body: '',
-            formData: []
+            formData: [],
+            auth: { type: 'noauth' },
+            testScript: ''
         };
         try {
-            const res = await axios.post('http://localhost:3000/api/apitest/requests', newReq);
-            setRequests([...requests, res.data]);
-            setActiveRequest(res.data);
+            const headers = getAuthHeaders();
+            const res = await axios.post(
+                'http://localhost:3000/api/apitest/requests',
+                newReq,
+                { headers }
+            );
+            setRequests([...requests, res.data.request]);
+            setActiveRequest(res.data.request);
         } catch (e) {
-            console.error(e);
+            console.error('Failed to create request:', e);
         }
     };
 
     const handleDeleteCollection = async (id: string) => {
         try {
-            await axios.delete(`http://localhost:3000/api/apitest/collections/${id}`);
+            const headers = getAuthHeaders();
+            await axios.delete(`http://localhost:3000/api/apitest/collections/${id}`, { headers });
             setCollections(collections.filter(c => c._id !== id));
             setRequests(requests.filter(r => r.collectionId !== id));
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error('Failed to delete collection:', e);
+        }
     };
 
     const handleDeleteRequest = async (id: string) => {
         try {
-            await axios.delete(`http://localhost:3000/api/apitest/requests/${id}`);
+            const headers = getAuthHeaders();
+            await axios.delete(`http://localhost:3000/api/apitest/requests/${id}`, { headers });
             setRequests(requests.filter(r => r._id !== id));
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error('Failed to delete request:', e);
+        }
     };
 
     // Save current active request (Update)
-    // We need to know if we are editing an existing persistent request or a temporary one
-    // The current UI assumes activeRequest is just state.
-    // If activeRequest has an _id that matches a request in `requests`, we update it.
     const handleSaveRequest = async () => {
         if (!activeRequest._id || !requests.find(r => r._id === activeRequest._id)) {
-            // It's a new or history item, prompt to save as new? 
-            // For MVP, just update internal state or auto-save if selected?
-            // Let's implement an explicit "Update" if it exists in list.
+            console.log('Request not found in list, cannot save');
             return;
         }
 
         try {
-            const payload = { ...activeRequest, workspaceId };
-            const res = await axios.post('http://localhost:3000/api/apitest/requests', payload);
+            const headers = getAuthHeaders();
+            const res = await axios.put(
+                `http://localhost:3000/api/apitest/requests/${activeRequest._id}`,
+                activeRequest,
+                { headers }
+            );
             // Update list
-            setRequests(requests.map(r => r._id === res.data._id ? res.data : r));
-            alert('Request saved.');
+            setRequests(requests.map(r => r._id === res.data.request._id ? res.data.request : r));
+            alert('Request saved successfully!');
         } catch (e) {
-            console.error(e);
-            alert('Failed to save');
+            console.error('Failed to save request:', e);
+            alert('Failed to save request');
         }
     };
 
@@ -334,6 +357,7 @@ export default function ApiTestPanel() {
                         request={activeRequest}
                         onChange={setActiveRequest}
                         onRun={handleRun}
+                        onSave={handleSaveRequest}
                         isLoading={isLoading}
                         environments={environments}
                         activeEnvId={activeEnvId}

@@ -41,17 +41,28 @@ const authenticateToken = async (req, res, next) => {
       throw new AuthenticationError('No token provided');
     }
 
+    // Check Redis cache first
     const cachedUser = await redisClient.get(`session:${token}`);
     if (cachedUser) {
       req.user = cachedUser;
       return next();
     }
 
-    jwt.verify(token, config.jwt.secret, (err, decoded) => {
+    // Verify JWT token
+    jwt.verify(token, config.jwt.secret, async (err, decoded) => {
       if (err) {
-        throw new AuthenticationError('Invalid token');
+        return next(new AuthenticationError('Invalid token'));
       }
+      
       req.user = decoded;
+      
+      // Cache the user session in Redis for 1 hour
+      try {
+        await redisClient.set(`session:${token}`, decoded, 3600);
+      } catch (cacheErr) {
+        logger.warn('Failed to cache session:', cacheErr);
+      }
+      
       next();
     });
   } catch (error) {

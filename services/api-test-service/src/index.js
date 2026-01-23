@@ -34,6 +34,20 @@ app.delete('/collections/:id', asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Collection deleted' });
 }));
 
+// Update collection
+app.put('/collections/:id', asyncHandler(async (req, res) => {
+  const { userId, name, parentId } = req.body;
+  const collection = await ApiCollection.findOneAndUpdate(
+    { _id: req.params.id, userId },
+    { name, parentId },
+    { new: true }
+  );
+  if (!collection) {
+    return res.status(404).json({ success: false, message: 'Collection not found' });
+  }
+  res.json({ success: true, collection });
+}));
+
 app.post('/requests', asyncHandler(async (req, res) => {
   const { userId, request } = req.body;
   const reqDoc = new ApiRequest({ ...request, userId });
@@ -54,6 +68,20 @@ app.delete('/requests/:id', asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Request deleted' });
 }));
 
+// Update request
+app.put('/requests/:id', asyncHandler(async (req, res) => {
+  const { userId, ...updateData } = req.body;
+  const request = await ApiRequest.findOneAndUpdate(
+    { _id: req.params.id, userId },
+    updateData,
+    { new: true }
+  );
+  if (!request) {
+    return res.status(404).json({ success: false, message: 'Request not found' });
+  }
+  res.json({ success: true, request });
+}));
+
 app.post('/environments', asyncHandler(async (req, res) => {
   const { userId, environment } = req.body;
   const envDoc = new ApiEnvironment({ ...environment, userId });
@@ -70,6 +98,20 @@ app.post('/environments/list', asyncHandler(async (req, res) => {
 app.delete('/environments/:id', asyncHandler(async (req, res) => {
   await ApiEnvironment.findOneAndDelete({ _id: req.params.id, userId: req.body.userId });
   res.json({ success: true, message: 'Environment deleted' });
+}));
+
+// Update environment
+app.put('/environments/:id', asyncHandler(async (req, res) => {
+  const { userId, ...updateData } = req.body;
+  const environment = await ApiEnvironment.findOneAndUpdate(
+    { _id: req.params.id, userId },
+    updateData,
+    { new: true }
+  );
+  if (!environment) {
+    return res.status(404).json({ success: false, message: 'Environment not found' });
+  }
+  res.json({ success: true, environment });
 }));
 
 app.post('/history', asyncHandler(async (req, res) => {

@@ -41,9 +41,13 @@ const templateConfigs = {
         name: 'node-hello',
         version: '1.0.0',
         main: 'index.js',
-        scripts: { start: 'node index.js' }
+        scripts: { start: 'node index.js' },
+        dependencies: {
+          "express": "^4.18.2",
+          "cors": "^2.8.5"
+        }
       }, null, 2),
-      'index.js': 'const express = require("express");\nconst app = express();\napp.get("/", (req, res) => res.send("Hello from Node.js!"));\napp.listen(3000, "0.0.0.0", () => console.log("Server running on port 3000"));'
+      'index.js': 'const express = require("express");\nconst cors = require("cors");\nconst app = express();\n\napp.use(cors());\napp.get("/", (req, res) => res.send("Hello from Node.js!"));\n\napp.listen(3000, "0.0.0.0", () => console.log("Server running on port 3000"));'
     }
   },
   'react-app': {
@@ -53,6 +57,13 @@ const templateConfigs = {
     // Keep container running so we can exec commands
     cmd: ['-c', 'tail -f /dev/null'],
     port: 5173
+  },
+  'nextjs': {
+    image: 'node:20-alpine',
+    language: 'typescript',
+    entrypoint: 'sh',
+    cmd: ['-c', 'tail -f /dev/null'],
+    port: 3000
   },
   'python-flask': {
     image: 'python:3.11-alpine',
@@ -165,6 +176,9 @@ async function createContainer(userId, workspaceId, templateId) {
       setupScript = 'if [ ! -f package.json ]; then npm create vite@latest . -- --template react-ts --yes; fi && npm install';
     } else if (templateId === 'node-hello') {
       setupScript = 'npm install';
+    } else if (templateId === 'nextjs') {
+      // Use create-next-app non-interactively in the current directory
+      setupScript = 'if [ ! -f package.json ]; then npx create-next-app@latest . --use-npm --no-git --ts --eslint --tailwind --src-dir --app --import-alias "@/*" --yes; fi && npm install';
     }
 
     if (setupScript) {
