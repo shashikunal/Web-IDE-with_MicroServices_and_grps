@@ -11,13 +11,26 @@ interface Template {
   hasPreview: boolean;
 }
 
-const TEMPLATES: Template[] = [
-  { id: 'node-hello', name: 'Node.js', language: 'javascript', description: 'Express Server', icon: '🟢', color: 'from-green-500/20 to-green-600/10 border-green-500/30', hasPreview: true },
-  { id: 'react-app', name: 'React', language: 'typescript', description: 'Vite + React', icon: '⚛️', color: 'from-cyan-500/20 to-cyan-600/10 border-cyan-500/30', hasPreview: true },
-  { id: 'python-flask', name: 'Python', language: 'python', description: 'Flask App', icon: '🐍', color: 'from-yellow-500/20 to-yellow-600/10 border-yellow-500/30', hasPreview: true },
-  { id: 'go-api', name: 'Go', language: 'go', description: 'HTTP Server', icon: '🔵', color: 'from-blue-500/20 to-blue-600/10 border-blue-500/30', hasPreview: true },
-  { id: 'cpp-hello', name: 'C++', language: 'cpp', description: 'GCC Compiler', icon: '🟣', color: 'from-purple-500/20 to-purple-600/10 border-purple-500/30', hasPreview: false },
-  { id: 'html-site', name: 'HTML', language: 'html', description: 'Landing Page', icon: '📄', color: 'from-orange-500/20 to-orange-600/10 border-orange-500/30', hasPreview: true },
+const LANGUAGES: Template[] = [
+  { id: 'c-lang', name: 'C', language: 'c', description: 'GCC | Binary', icon: '🇨', color: 'from-blue-400/20 to-blue-500/10 border-blue-400/30', hasPreview: false },
+  { id: 'cpp-hello', name: 'C++', language: 'cpp', description: 'G++ | Binary', icon: '⚙️', color: 'from-blue-600/20 to-blue-700/10 border-blue-600/30', hasPreview: false },
+  { id: 'rust-lang', name: 'Rust', language: 'rust', description: 'Rustc | Cargo', icon: '🦀', color: 'from-orange-700/20 to-orange-800/10 border-orange-700/30', hasPreview: false },
+  { id: 'go-api', name: 'Go', language: 'go', description: 'Go Build | Binary', icon: '🔵', color: 'from-cyan-500/20 to-cyan-600/10 border-cyan-500/30', hasPreview: true },
+  { id: 'python-flask', name: 'Python', language: 'python', description: 'Python 3.11', icon: '🐍', color: 'from-yellow-500/20 to-yellow-600/10 border-yellow-500/30', hasPreview: true },
+  { id: 'node-hello', name: 'Node.js', language: 'javascript', description: 'Node V20', icon: '🟢', color: 'from-green-500/20 to-green-600/10 border-green-500/30', hasPreview: true },
+  { id: 'ruby-lang', name: 'Ruby', language: 'ruby', description: 'Ruby MRI', icon: '💎', color: 'from-red-600/20 to-red-700/10 border-red-600/30', hasPreview: false },
+  { id: 'php-lang', name: 'PHP', language: 'php', description: 'PHP 8.2', icon: '🐘', color: 'from-indigo-400/20 to-indigo-500/10 border-indigo-400/30', hasPreview: true },
+  { id: 'java-maven', name: 'Java', language: 'java', description: 'JVM | Maven', icon: '☕', color: 'from-orange-500/20 to-orange-600/10 border-orange-500/30', hasPreview: true },
+];
+
+const FRAMEWORKS: Template[] = [
+  { id: 'react-app', name: 'React', language: 'typescript', description: 'Vite | Node', icon: '⚛️', color: 'from-cyan-400/20 to-cyan-500/10 border-cyan-400/30', hasPreview: true },
+  { id: 'nextjs', name: 'Next.js', language: 'typescript', description: 'Next | Node', icon: '▲', color: 'from-gray-500/20 to-gray-600/10 border-gray-500/30', hasPreview: true },
+  { id: 'angular', name: 'Angular', language: 'typescript', description: 'NG CLI | Node', icon: '🅰️', color: 'from-red-500/20 to-red-600/10 border-red-500/30', hasPreview: true },
+  { id: 'vue-app', name: 'Vue.js', language: 'javascript', description: 'Vite | Node', icon: '💚', color: 'from-green-400/20 to-green-500/10 border-green-400/30', hasPreview: true },
+  { id: 'fastapi-app', name: 'FastAPI', language: 'python', description: 'Uvicorn | Python', icon: '⚡', color: 'from-teal-500/20 to-teal-600/10 border-teal-500/30', hasPreview: true },
+  { id: 'spring-boot', name: 'Spring Boot', language: 'java', description: 'Spring | JVM', icon: '🍃', color: 'from-green-600/20 to-green-700/10 border-green-600/30', hasPreview: true },
+  { id: 'dotnet', name: '.NET Core', language: 'csharp', description: 'ASP.NET | CLR', icon: '🟣', color: 'from-purple-500/20 to-purple-600/10 border-purple-500/30', hasPreview: true },
 ];
 
 interface TemplateSelectionProps {
@@ -36,8 +49,13 @@ export default function TemplateSelection({
   isAuthenticated
 }: TemplateSelectionProps) {
   const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'languages' | 'frameworks'>('languages');
 
-  const filtered = TEMPLATES.filter(t =>
+  const filteredLanguages = LANGUAGES.filter(t =>
+    t.name.toLowerCase().includes(search.toLowerCase()) || t.description.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const filteredFrameworks = FRAMEWORKS.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase()) || t.description.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -56,11 +74,11 @@ export default function TemplateSelection({
             </svg>
             <h1 style={{ fontSize: '32px', fontWeight: 600, color: '#cccccc' }}>Code Playground</h1>
           </div>
-          <p style={{ color: '#858585', fontSize: '18px' }}>Browser-based VS Code IDE with Docker containers</p>
+          <p style={{ color: '#858585', fontSize: '18px' }}>Multi-Language IDE with Docker Containers</p>
         </div>
 
         <div style={{ marginBottom: '40px' }}>
-          <div style={{ position: 'relative', maxWidth: '500px', margin: '0 auto' }}>
+          <div style={{ position: 'relative', maxWidth: '500px', margin: '0 auto', marginBottom: '24px' }}>
             <svg style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', width: '20px', height: '20px', color: '#858585' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <circle cx="11" cy="11" r="8" strokeWidth={2} />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
@@ -82,6 +100,39 @@ export default function TemplateSelection({
                 transition: 'border-color 0.2s'
               }}
             />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+            <button
+              onClick={() => setActiveTab('languages')}
+              style={{
+                padding: '10px 24px',
+                borderRadius: '8px',
+                backgroundColor: activeTab === 'languages' ? '#007acc' : 'transparent',
+                color: activeTab === 'languages' ? 'white' : '#858585',
+                border: activeTab === 'languages' ? 'none' : '1px solid #3d3d3d',
+                cursor: 'pointer',
+                fontWeight: 500,
+                transition: 'all 0.2s'
+              }}
+            >
+              Languages
+            </button>
+            <button
+              onClick={() => setActiveTab('frameworks')}
+              style={{
+                padding: '10px 24px',
+                borderRadius: '8px',
+                backgroundColor: activeTab === 'frameworks' ? '#007acc' : 'transparent',
+                color: activeTab === 'frameworks' ? 'white' : '#858585',
+                border: activeTab === 'frameworks' ? 'none' : '1px solid #3d3d3d',
+                cursor: 'pointer',
+                fontWeight: 500,
+                transition: 'all 0.2s'
+              }}
+            >
+              Frameworks
+            </button>
           </div>
         </div>
 
@@ -123,7 +174,7 @@ export default function TemplateSelection({
           opacity: isAuthenticated ? 1 : 0.5,
           pointerEvents: isAuthenticated ? 'auto' : 'none'
         }}>
-          {filtered.map((template) => (
+          {(activeTab === 'languages' ? filteredLanguages : filteredFrameworks).map((template) => (
             <button
               key={template.id}
               onClick={() => onSelect(template)}

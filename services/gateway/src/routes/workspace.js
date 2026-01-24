@@ -91,7 +91,6 @@ router.delete('/:workspaceId', asyncHandler(async (req, res) => {
   }
 
   res.status(response.status).json(data);
-  res.status(response.status).json(data);
 }));
 
 router.post('/:workspaceId/stop', asyncHandler(async (req, res) => {

@@ -107,16 +107,26 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
   const [username, setUsername] = useState('User');
 
   useEffect(() => {
-    try {
-      const userStr = localStorage.getItem('user');
-      if (userStr) {
-        const u = JSON.parse(userStr);
-        if (u.username) setUsername(u.username);
+    const updateUsername = () => {
+      try {
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+          const u = JSON.parse(userStr);
+          if (u.username) setUsername(u.username);
+        } else {
+          setUsername('User');
+        }
+      } catch (e) {
+        console.error('Failed to parse user', e);
       }
-    } catch (e) {
-      console.error('Failed to parse user', e);
-    }
-  }, []);
+    };
+
+    updateUsername();
+
+    // Listen for storage events to sync across tabs/components
+    window.addEventListener('storage', updateUsername);
+    return () => window.removeEventListener('storage', updateUsername);
+  }, [userId]);
 
   const handleLogout = () => {
     localStorage.removeItem('accessToken');

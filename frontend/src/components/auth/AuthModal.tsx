@@ -34,6 +34,15 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
     e.preventDefault();
 
     if (isLogin) {
+      if (!formData.email && !formData.username) {
+        toast.error('Email or Username is required');
+        return;
+      }
+      if (!formData.password) {
+        toast.error('Password is required');
+        return;
+      }
+
       try {
         const result = await login({
           identifier: formData.email || formData.username,
@@ -47,10 +56,28 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
         });
         onClose();
       } catch (error: any) {
-        toast.error(error.data?.message || 'Login failed');
+        const message = error.data?.message || 'Login failed';
+        if (message === 'Invalid credentials' || message.toLowerCase().includes('password')) {
+          toast.error('Invalid Email or Password');
+        } else {
+          toast.error(message);
+        }
       }
     } else {
       // Registration validation
+      if (!formData.email) {
+        toast.error('Email is required');
+        return;
+      }
+      if (!formData.username) {
+        toast.error('Username is required');
+        return;
+      }
+      if (!formData.password) {
+        toast.error('Password is required');
+        return;
+      }
+
       if (formData.password !== formData.confirmPassword) {
         toast.error('Passwords do not match');
         return;

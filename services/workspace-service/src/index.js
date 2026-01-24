@@ -29,86 +29,72 @@ const TEMPLATES_DIR = path.resolve(process.cwd(), 'templates');
 const CONTAINER_MEMORY_LIMIT = '2g';
 const CONTAINER_CPU_LIMIT = 2.0;
 
-const templateConfigs = {
-  'node-hello': {
-    image: 'node:20-alpine',
-    language: 'javascript',
-    entrypoint: 'sh',
-    cmd: ['-c', 'tail -f /dev/null'],
-    port: 3000,
-    files: {
-      'package.json': JSON.stringify({
-        name: 'node-hello',
-        version: '1.0.0',
-        main: 'index.js',
-        scripts: { start: 'node index.js' },
-        dependencies: {
-          "express": "^4.18.2",
-          "cors": "^2.8.5"
+import templateConfigs from './templates/index.js';
+
+
+
+async function ensureApplicationRunning(container, templateId, force = false) {
+  const template = templateConfigs[templateId];
+  if (!template || !template.startCommand) return;
+
+  try {
+    if (!force) {
+        // Check if process is already running to avoid duplicates
+        // Using a simple check with ps aux. 
+        const execCheck = await container.exec({
+          Cmd: ['sh', '-c', 'ps aux'],
+          AttachStdout: true,
+          AttachStderr: false
+        });
+        
+        const stream = await execCheck.start({});
+        let output = '';
+        
+        await new Promise((resolve, reject) => {
+            stream.on('data', chunk => output += chunk.toString());
+            stream.on('end', resolve);
+            stream.on('error', reject);
+        });
+
+        // Debug output
+        // console.log(`[Container] ps aux output: ${output}`);
+
+        // Simple heuristic: check if the command string is present in ps output
+        // "npm run" is too generic and might match artifacts.
+        // We check for the specific command or common framework binaries
+        if (output.includes(template.startCommand)) {
+           console.log(`[Container] Application '${template.startCommand}' appears to be running.`);
+           return;
         }
-      }, null, 2),
-      'index.js': 'const express = require("express");\nconst cors = require("cors");\nconst app = express();\n\napp.use(cors());\napp.get("/", (req, res) => res.send("Hello from Node.js!"));\n\napp.listen(3000, "0.0.0.0", () => console.log("Server running on port 3000"));'
+        
+        // Specific checks for frameworks to detect actual running servers
+        if (templateId === 'nextjs' && output.includes('next-server')) {
+             console.log(`[Container] Next.js server appears to be running.`);
+             return;
+        }
+        if (templateId === 'react-app' && output.includes('vite')) {
+             console.log(`[Container] Vite server appears to be running.`);
+             return;
+        }
+        if (templateId === 'angular' && (output.includes('ng serve') || output.includes('angular-cli'))) {
+             console.log(`[Container] Angular server appears to be running.`);
+             return;
+        }
     }
-  },
-  'react-app': {
-    image: 'node:20-alpine',
-    language: 'typescript',
-    entrypoint: 'sh',
-    // Keep container running so we can exec commands
-    cmd: ['-c', 'tail -f /dev/null'],
-    port: 5173
-  },
-  'nextjs': {
-    image: 'node:20-alpine',
-    language: 'typescript',
-    entrypoint: 'sh',
-    cmd: ['-c', 'tail -f /dev/null'],
-    port: 3000
-  },
-  'python-flask': {
-    image: 'python:3.11-alpine',
-    language: 'python',
-    entrypoint: 'sh',
-    cmd: ['-c', 'pip install flask && python app.py'],
-    port: 5000,
-    files: {
-      'app.py': 'from flask import Flask\napp = Flask(__name__)\n@app.route("/")\ndef hello(): return "Hello from Python Flask!"\nif __name__ == "__main__": app.run(host="0.0.0.0", port=5000)'
-    }
-  },
-  'go-api': {
-    image: 'golang:1.21-alpine',
-    language: 'go',
-    entrypoint: 'sh',
-    cmd: ['-c', 'go mod init app && go run main.go'],
-    port: 8080,
-    files: {
-      'main.go': 'package main\nimport ("fmt"\n"net/http")\nfunc main() {\n    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {\n        fmt.Fprintf(w, "Hello from Go!")\n    })\n    http.ListenAndServe(":8080", nil)\n}'
-    }
-  },
-  'cpp-hello': {
-    image: 'gcc:12-alpine',
-    language: 'cpp',
-    entrypoint: 'sh',
-    cmd: ['-c', 'g++ -o main main.cpp && ./main'],
-    port: null,
-    files: {
-      'main.cpp': '#include <iostream>\nint main() { std::cout << "Hello from C++!" << std::endl; return 0; }',
-      'Makefile': 'all:\n\tg++ -o main main.cpp\nclean:\n\trm -f main'
-    }
-  },
-  'html-site': {
-    image: 'nginx:alpine',
-    language: 'html',
-    entrypoint: 'sh',
-    cmd: ['-c', 'cp -r /workspace/* /usr/share/nginx/html && nginx -g "daemon off;"'],
-    port: 80,
-    files: {
-      'index.html': '<!DOCTYPE html><html><head><title>Static Site</title></head><body><h1>Hello from HTML!</h1></body></html>',
-      'style.css': 'body { font-family: sans-serif; padding: 20px; }',
-      'app.js': 'console.log("Hello from JavaScript!");'
-    }
+
+    console.log(`[Container] Starting application with: ${template.startCommand}`);
+    // we use a detached exec so it runs in background
+    const execStart = await container.exec({
+        Cmd: ['sh', '-c', `${template.startCommand} > /tmp/app.log 2>&1 &`],
+        AttachStdout: false,
+        AttachStderr: false
+    });
+    await execStart.start({ Detach: true });
+    console.log('[Container] Application server started in background.');
+  } catch (err) {
+    console.error(`[Container] Failed to ensure application running: ${err.message}`);
   }
-};
+}
 
 async function createContainer(userId, workspaceId, templateId) {
   if (!docker) throw new Error('Docker not available');
@@ -171,15 +157,7 @@ async function createContainer(userId, workspaceId, templateId) {
     await container.start();
 
     // Initialize Project & Install Dependencies
-    let setupScript = null;
-    if (templateId === 'react-app') {
-      setupScript = 'if [ ! -f package.json ]; then npm create vite@latest . -- --template react-ts --yes; fi && npm install';
-    } else if (templateId === 'node-hello') {
-      setupScript = 'npm install';
-    } else if (templateId === 'nextjs') {
-      // Use create-next-app non-interactively in the current directory
-      setupScript = 'if [ ! -f package.json ]; then npx create-next-app@latest . --use-npm --no-git --ts --eslint --tailwind --src-dir --app --import-alias "@/*" --yes; fi && npm install';
-    }
+    const setupScript = template.setupScript;
 
     if (setupScript) {
       console.log(`[Container] Running setup for ${templateId}: ${setupScript}`);
@@ -229,6 +207,9 @@ export default defineConfig({
         console.error('[Container] Failed to write vite.config.ts:', err);
       }
     }
+  
+    // Start the application server if a start command is defined
+    await ensureApplicationRunning(container, templateId, true);
 
     // Inspect to get mapped port
     let publicPort = 0;
@@ -407,11 +388,13 @@ app.post('/workspace/:workspaceId/start', asyncHandler(async (req, res) => {
     try {
       const container = docker.getContainer(workspace.containerId);
       await container.start();
+      await ensureApplicationRunning(container, workspace.templateId);
       workspace.status = 'running';
       await workspace.save();
     } catch (error) {
       if (error.statusCode === 304) {
          // Container already started
+        await ensureApplicationRunning(container, workspace.templateId);
         workspace.status = 'running';
         await workspace.save();
       } else if (error.statusCode === 404) {
@@ -519,6 +502,7 @@ app.post('/workspace/:workspaceId/ensure-running', asyncHandler(async (req, res)
     if (!isRunning) {
       // Start the container
       await container.start();
+      await ensureApplicationRunning(container, workspace.templateId);
       workspace.status = 'running';
       await workspace.save();
       logger.info(`Container ${workspace.containerId} started`);
@@ -532,6 +516,7 @@ app.post('/workspace/:workspaceId/ensure-running', asyncHandler(async (req, res)
     }
     
     // Container is already running - save any port updates
+    await ensureApplicationRunning(container, workspace.templateId);
     workspace.status = 'running';
     await workspace.save();
     return res.json({ 
@@ -565,6 +550,8 @@ app.post('/workspace/:workspaceId/ensure-running', asyncHandler(async (req, res)
       }
     } else if (error.statusCode === 304) {
       // Container already started
+      const container = docker.getContainer(workspace.containerId);
+      await ensureApplicationRunning(container, workspace.templateId);
       workspace.status = 'running';
       await workspace.save();
       return res.json({ 

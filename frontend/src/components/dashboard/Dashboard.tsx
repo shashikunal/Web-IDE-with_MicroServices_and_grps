@@ -6,6 +6,7 @@ import {
 } from '../../store/api/apiSlice';
 import type { Workspace } from '../../store/api/apiSlice';
 import toast from 'react-hot-toast';
+import { useState } from 'react';
 
 interface DashboardProps {
   onSelectWorkspace: (ws: Workspace) => void;
@@ -17,6 +18,7 @@ export default function Dashboard({ onSelectWorkspace, onBack }: DashboardProps)
   const [deleteWorkspace, { isLoading: isDeleting }] = useDeleteWorkspaceMutation();
   const [stopWorkspace] = useStopWorkspaceMutation();
   const [startWorkspace] = useStartWorkspaceMutation();
+  const [workspaceToDelete, setWorkspaceToDelete] = useState<{ userId: string, workspaceId: string } | null>(null);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return 'Never';
@@ -63,23 +65,29 @@ export default function Dashboard({ onSelectWorkspace, onBack }: DashboardProps)
   const handleDelete = async (userId: string, workspaceId: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    setWorkspaceToDelete({ userId, workspaceId });
+  };
 
-    console.log('Delete clicked for workspace:', workspaceId, 'user:', userId);
-
-    if (!confirm('Are you sure you want to delete this workspace? This will also stop and remove the container.')) {
-      console.log('Delete cancelled by user');
-      return;
-    }
+  const confirmDelete = async () => {
+    if (!workspaceToDelete) return;
 
     try {
-      console.log('Calling deleteWorkspace mutation...');
-      await deleteWorkspace({ workspaceId, userId }).unwrap();
+      console.log('Calling deleteWorkspace mutation for:', workspaceToDelete.workspaceId);
+      await deleteWorkspace(workspaceToDelete).unwrap();
       console.log('Delete successful');
       toast.success('Workspace deleted');
+      setWorkspaceToDelete(null);
     } catch (err: any) {
       console.error('Delete failed:', err);
       toast.error('Failed to delete workspace: ' + (err?.data?.message || err.message || 'Unknown error'));
+      // Keep modal open on error? Or close it? Usually keep it if we want to retry, but for now let's close or user can try again.
+      // Better to close it to avoid stuck state if error is permanent.
+      setWorkspaceToDelete(null);
     }
+  };
+
+  const cancelDelete = () => {
+    setWorkspaceToDelete(null);
   };
 
   if (isError) {
@@ -177,7 +185,23 @@ export default function Dashboard({ onSelectWorkspace, onBack }: DashboardProps)
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="w-12 h-12 rounded-xl bg-[var(--color-vs-activity)] flex items-center justify-center text-2xl flex-shrink-0 shadow-soft">
-                      {ws.templateName === 'react-app' ? '⚛️' : ws.templateName === 'node-hello' ? '🟢' : ws.templateName === 'python-flask' ? '🐍' : ws.templateName === 'go-api' ? '🔵' : ws.templateName === 'cpp-hello' ? '🟣' : ws.templateName === 'html-site' ? '📄' : '📁'}
+                      {ws.templateName === 'react-app' ? '⚛️' :
+                        ws.templateName === 'node-hello' ? '🟢' :
+                          ws.templateName === 'python-flask' ? '🐍' :
+                            ws.templateName === 'go-api' ? '🔵' :
+                              ws.templateName === 'cpp-hello' ? '⚙️' :
+                                ws.templateName === 'html-site' ? '📄' :
+                                  ws.templateName === 'nextjs' ? '▲' :
+                                    ws.templateName === 'angular' ? '🅰️' :
+                                      ws.templateName === 'vue-app' ? '💚' :
+                                        ws.templateName === 'fastapi-app' ? '⚡' :
+                                          ws.templateName === 'java-maven' ? '☕' :
+                                            ws.templateName === 'spring-boot' ? '🍃' :
+                                              ws.templateName === 'dotnet' ? '🟣' :
+                                                ws.templateName === 'c-lang' ? '🇨' :
+                                                  ws.templateName === 'rust-lang' ? '🦀' :
+                                                    ws.templateName === 'ruby-lang' ? '💎' :
+                                                      ws.templateName === 'php-lang' ? '🐘' : '📁'}
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-white text-base truncate group-hover:text-[var(--color-vs-status)] transition-colors">{ws.templateName}</h3>
@@ -189,8 +213,8 @@ export default function Dashboard({ onSelectWorkspace, onBack }: DashboardProps)
                 {/* Status Badge */}
                 <div className="mb-4">
                   <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${ws.status === 'running'
-                      ? 'bg-[var(--color-vs-success)]/10 text-[var(--color-vs-success)] border-[var(--color-vs-success)]/20'
-                      : 'bg-[var(--color-vs-error)]/10 text-[var(--color-vs-error)] border-[var(--color-vs-error)]/20'
+                    ? 'bg-[var(--color-vs-success)]/10 text-[var(--color-vs-success)] border-[var(--color-vs-success)]/20'
+                    : 'bg-[var(--color-vs-error)]/10 text-[var(--color-vs-error)] border-[var(--color-vs-error)]/20'
                     }`}>
                     <div className={`w-2 h-2 rounded-full ${ws.status === 'running' ? 'bg-[var(--color-vs-success)] animate-pulse' : 'bg-[var(--color-vs-error)]'}`} />
                     <span className="uppercase tracking-wider">{ws.status}</span>
@@ -247,6 +271,52 @@ export default function Dashboard({ onSelectWorkspace, onBack }: DashboardProps)
           </div>
         )}
       </div>
-    </div>
+
+      {/* Delete Confirmation Modal */}
+      {
+        workspaceToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div
+              className="w-full max-w-md bg-[var(--color-vs-sidebar)] border border-[var(--color-vs-border)] rounded-xl shadow-2xl overflow-hidden scale-100 animate-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-[var(--color-vs-error)]/10 flex items-center justify-center text-[var(--color-vs-error)]">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold text-[var(--color-vs-text)]">Delete Workspace?</h3>
+                    <p className="text-[var(--color-vs-text-muted)] text-sm">This action cannot be undone.</p>
+                  </div>
+                </div>
+
+                <p className="text-[var(--color-vs-text-muted)] mb-6">
+                  Are you sure you want to delete this workspace? This will permanently remove the container and all associated files.
+                </p>
+
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    onClick={cancelDelete}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--color-vs-text-muted)] hover:text-[var(--color-vs-text)] hover:bg-[var(--color-vs-hover)] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDelete}
+                    disabled={isDeleting}
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--color-vs-error)] text-white hover:bg-[var(--color-vs-error)]/90 disabled:opacity-50 disabled:cursor-wait transition-colors shadow-lg shadow-[var(--color-vs-error)]/20"
+                  >
+                    {isDeleting ? 'Deleting...' : 'Delete Workspace'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    </div >
   );
 }

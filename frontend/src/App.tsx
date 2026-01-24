@@ -38,7 +38,19 @@ function AppContent() {
       'node-hello': 'javascript',
       'python-flask': 'python',
       'go-api': 'go',
-      'html-site': 'html'
+      'html-site': 'html',
+      'nextjs': 'typescript',
+      'angular': 'typescript',
+      'vue-app': 'javascript',
+      'fastapi-app': 'python',
+      'java-maven': 'java',
+      'spring-boot': 'java',
+      'dotnet': 'csharp',
+      'cpp-hello': 'cpp',
+      'c-lang': 'c',
+      'rust-lang': 'rust',
+      'ruby-lang': 'ruby',
+      'php-lang': 'php'
     };
     return languageMap[templateId] || 'javascript';
   }
@@ -51,7 +63,7 @@ function AppContent() {
         id: urlTemplateId,
         name: urlTemplateId.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
         language: getTemplateLanguage(urlTemplateId),
-        hasPreview: ['react-app', 'html-site', 'node-hello', 'python-flask', 'go-api'].includes(urlTemplateId),
+        hasPreview: ['react-app', 'html-site', 'node-hello', 'python-flask', 'go-api', 'nextjs', 'angular', 'vue-app', 'fastapi-app', 'java-maven', 'spring-boot', 'dotnet', 'php-lang'].includes(urlTemplateId),
         description: '',
         icon: '📁',
         color: '#007acc'
@@ -73,7 +85,7 @@ function AppContent() {
         id: urlTemplate,
         name: urlTemplate.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
         language: getTemplateLanguage(urlTemplate),
-        hasPreview: ['react-app', 'html-site', 'node-hello', 'python-flask', 'go-api'].includes(urlTemplate),
+        hasPreview: ['react-app', 'html-site', 'node-hello', 'python-flask', 'go-api', 'nextjs', 'angular', 'vue-app', 'fastapi-app', 'java-maven', 'spring-boot', 'dotnet', 'php-lang'].includes(urlTemplate),
         description: 'Restored workspace',
         icon: '📁',
         color: '#007acc'
@@ -123,7 +135,7 @@ function AppContent() {
       id: workspace.templateId,
       name: workspace.templateName,
       language: workspace.language,
-      hasPreview: ['react-app', 'html-site', 'node-hello', 'python-flask', 'go-api'].includes(workspace.templateId),
+      hasPreview: ['react-app', 'html-site', 'node-hello', 'python-flask', 'go-api', 'nextjs', 'angular', 'vue-app', 'fastapi-app', 'java-maven', 'spring-boot', 'dotnet', 'php-lang'].includes(workspace.templateId),
       description: 'Resumed workspace',
       icon: '📁',
       color: '#007acc'
@@ -280,9 +292,12 @@ function AppContent() {
   );
 }
 
+import { Toaster } from 'react-hot-toast';
+
 export default function App() {
   return (
     <BrowserRouter>
+      <Toaster position="top-center" />
       <AppContent />
     </BrowserRouter>
   );

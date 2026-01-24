@@ -91,7 +91,7 @@ const setupWebSocket = (server) => {
 
       // Create exec instance for interactive shell
       const exec = await container.exec({
-        Cmd: ['/bin/sh'],
+        Cmd: ['/bin/sh', '-c', 'if [ -f /tmp/app.log ]; then echo "\\033[1;36m--- Dev Server Auto-Started ---\\033[0m"; echo "Streaming logs from /tmp/app.log..."; echo "Press Ctrl+C to stop logs and use terminal."; echo ""; trap : INT; tail -f /tmp/app.log; trap - INT; fi; exec /bin/sh'],
         AttachStdin: true,
         AttachStdout: true,
         AttachStderr: true,
