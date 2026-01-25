@@ -87,70 +87,80 @@ const setupWebSocket = (server) => {
     }
 
     try {
-      const container = docker.getContainer(session.containerId);
+      const startupCmd = (sessionId === 'main')
+        ? ['/bin/sh', '-c', 'if [ -f /tmp/app.log ]; then echo -e "\\r\\n\\033[38;5;39m●\\033[0m \\033[1mDevelopment Server Active\\033[0m"; echo -e "\\033[90m  Streaming logs. Press Ctrl+C to use terminal.\\033[0m\\r\\n"; trap : INT; tail -f /tmp/app.log; trap - INT; fi; exec /bin/sh']
+        : ['/bin/sh'];
 
-      // Create exec instance for interactive shell
-      const exec = await container.exec({
-        Cmd: ['/bin/sh', '-c', 'if [ -f /tmp/app.log ]; then echo "\\033[1;36m--- Dev Server Auto-Started ---\\033[0m"; echo "Streaming logs from /tmp/app.log..."; echo "Press Ctrl+C to stop logs and use terminal."; echo ""; trap : INT; tail -f /tmp/app.log; trap - INT; fi; exec /bin/sh'],
-        AttachStdin: true,
-        AttachStdout: true,
-        AttachStderr: true,
-        Tty: true,
-        WorkingDir: '/workspace',
-        Env: ['TERM=xterm', 'COLORTERM=truecolor']
+      // Arguments for docker exec
+      // -it: interactive tty
+      // -w: working directory
+      // -e: environment variables for color support
+      const args = [
+        'exec',
+        '-it',
+        '-w', '/workspace',
+        '-e', 'TERM=xterm-256color',
+        '-e', 'COLORTERM=truecolor',
+        session.containerId,
+        ...startupCmd
+      ];
+
+      logger.info(`Spawning PTY with args: ${args.join(' ')}`);
+
+      const ptyProcess = pty.spawn('docker', args, {
+        name: 'xterm-256color',
+        cols: session.cols || 80,
+        rows: session.rows || 24,
+        cwd: process.env.HOME,
+        env: process.env
       });
 
-      const stream = await exec.start({
-        hijack: true,
-        stdin: true,
-        Tty: true
-      });
+      session.pty = ptyProcess;
 
-      session.exec = exec;
-      session.stream = stream;
-
-      // Send data from container to WebSocket
-      stream.on('data', (data) => {
+      // Send data from PTY to WebSocket
+      ptyProcess.on('data', (data) => {
         if (ws.readyState === ws.OPEN) {
           ws.send(data);
         }
       });
 
-      // Send data from WebSocket to container
+      // Send data from WebSocket to PTY
       ws.on('message', (message) => {
         try {
-          // Try to parse as JSON for resize commands
-          const msg = JSON.parse(message);
-          if (msg.type === 'resize') {
-            exec.resize({ h: msg.rows, w: msg.cols }).catch(err => {
-              logger.error('Resize error:', err);
-            });
+          const msgStr = message.toString();
+          // Check for JSON resize message
+          if (msgStr.trim().startsWith('{')) {
+            const msg = JSON.parse(msgStr);
+            if (msg.type === 'resize') {
+              ptyProcess.resize(msg.cols, msg.rows);
+              return;
+            }
           }
+          // Otherwise write to terminal
+          ptyProcess.write(msgStr);
         } catch (e) {
-          // If not JSON, treat as raw terminal input
-          if (stream && stream.writable) {
-            stream.write(message.toString());
-          }
+          // Fallback just in case
+          console.error(e);
+          ptyProcess.write(message.toString());
         }
       });
 
+      // Handle cleanup
       ws.on('close', () => {
         logger.info(`WebSocket closed for session ${sessionId}`);
-        if (stream) {
-          stream.end();
-        }
+        ptyProcess.kill();
         sessions.delete(sessionId);
       });
 
-      stream.on('end', () => {
-        logger.info(`Container stream ended for session ${sessionId}`);
+      ptyProcess.on('exit', (code) => {
+        logger.info(`PTY exited with code ${code} for session ${sessionId}`);
         ws.close();
       });
 
-      logger.info(`Terminal session ${sessionId} connected to container ${session.containerId}`);
+      logger.info(`Terminal session ${sessionId} connected to container ${session.containerId} via node-pty`);
 
     } catch (error) {
-      logger.error('Failed to start docker exec:', error);
+      logger.error('Failed to start node-pty:', error);
       ws.send(`\r\n\x1b[1;31mError: ${error.message}\x1b[0m\r\n`);
       ws.close(1011, 'Failed to start terminal');
     }

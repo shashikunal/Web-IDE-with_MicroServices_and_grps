@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, FileCode, FolderPlus, AlertCircle } from 'lucide-react';
 
 interface CreateItemModalProps {
@@ -9,9 +9,9 @@ interface CreateItemModalProps {
   initialType?: 'file' | 'folder';
 }
 
-export default function CreateItemModal({ 
-  isOpen, 
-  onClose, 
+export default function CreateItemModal({
+  isOpen,
+  onClose,
   onCreate,
   defaultPath = '/',
   initialType = 'file'
@@ -21,23 +21,28 @@ export default function CreateItemModal({
   const [error, setError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const resetForm = useCallback(() => {
+    setName('');
+    setError('');
+    setType(initialType);
+  }, [initialType]);
+
   useEffect(() => {
     if (isOpen) {
-      setName('');
-      setError('');
-      setType(initialType);
+      resetForm();
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [isOpen, initialType]);
+  }, [isOpen, resetForm]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!name.trim()) {
       setError('Name is required');
       return;
     }
 
+    // eslint-disable-next-line no-control-regex
     const invalidChars = /[<>:"/\\|?*\x00-\x1f]/g;
     if (invalidChars.test(name)) {
       setError('Name contains invalid characters');
@@ -67,7 +72,7 @@ export default function CreateItemModal({
   if (!isOpen) return null;
 
   return (
-    <div 
+    <div
       style={{
         position: 'fixed',
         inset: 0,
@@ -116,18 +121,18 @@ export default function CreateItemModal({
               )}
             </div>
             <div>
-              <h2 style={{ 
-                color: '#cdd6f4', 
-                margin: 0, 
+              <h2 style={{
+                color: '#cdd6f4',
+                margin: 0,
                 fontSize: '18px',
                 fontWeight: 600
               }}>
                 Create New {type === 'folder' ? 'Folder' : 'File'}
               </h2>
-              <p style={{ 
-                color: '#6c7086', 
-                margin: '2px 0 0 0', 
-                fontSize: '12px' 
+              <p style={{
+                color: '#6c7086',
+                margin: '2px 0 0 0',
+                fontSize: '12px'
               }}>
                 {defaultPath === '/' ? 'Root directory' : defaultPath}
               </p>

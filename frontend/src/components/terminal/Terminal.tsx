@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { Plus, X } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 
 interface TerminalComponentProps {
@@ -13,6 +14,14 @@ interface TerminalComponentProps {
   initialData?: string;
   lastRefresh?: number;
 }
+
+const WELCOME_MESSAGE = [
+  '\r\n\x1b[38;5;39m  Welcome to Antigravity IDE \x1b[0m',
+  '\x1b[38;5;238m  ----------------------------------------\x1b[0m',
+  '\x1b[38;5;244m  • Environment: \x1b[38;5;255mNode.js / Docker\x1b[0m',
+  '\x1b[38;5;244m  • Status:      \x1b[38;5;42mOnline\x1b[0m',
+  '\r\n'
+].join('\r\n');
 
 export default function TerminalComponent({
   terminalId,
@@ -35,24 +44,41 @@ export default function TerminalComponent({
     if (initializedRef.current) return;
     if (!terminalRef.current) return;
 
-    console.log(`[Terminal] Mounting ${terminalId}`);
+    // console.log(`[Terminal] Mounting ${terminalId}`);
 
     const term = new Terminal({
       cursorBlink: true,
       cursorStyle: 'bar',
       cursorWidth: 2,
-      fontSize: 13,
+      fontSize: 14, // Slightly larger font
       fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
       theme: {
         background: '#181818',
-        foreground: '#eff0eb',
-        cursor: '#aeafad',
-        selectionBackground: '#264f78'
+        foreground: '#cccccc',
+        cursor: '#3b82f6', // Bright blue cursor
+        selectionBackground: '#264f78',
+        black: '#000000',
+        red: '#e06c75',
+        green: '#98c379',
+        yellow: '#e5c07b',
+        blue: '#61afef',
+        magenta: '#c678dd',
+        cyan: '#56b6c2',
+        white: '#abb2bf',
+        brightBlack: '#5c6370',
+        brightRed: '#e06c75',
+        brightGreen: '#98c379',
+        brightYellow: '#e5c07b',
+        brightBlue: '#61afef',
+        brightMagenta: '#c678dd',
+        brightCyan: '#56b6c2',
+        brightWhite: '#ffffff',
       },
       convertEol: true,
       macOptionIsMeta: true,
       rightClickSelectsWord: true,
-      scrollback: 1000,
+      scrollback: 2000,
+      allowProposedApi: true
     });
 
     const fitAddon = new FitAddon();
@@ -61,11 +87,13 @@ export default function TerminalComponent({
     term.open(terminalRef.current);
     fitAddon.fit();
 
-    if (initialData) {
+    // Write welcome message immediately if new session
+    if (!initialData) {
+      term.write(WELCOME_MESSAGE);
+    } else {
       setTimeout(() => {
-        // console.log(`[Terminal] Writing initial data to ${terminalId}. Length: ${initialData.length}`);
         term.write(initialData);
-      }, 100);
+      }, 50);
     }
 
     // Restore/Refresh logic
@@ -77,6 +105,7 @@ export default function TerminalComponent({
     term.onData((data) => {
       // Filter out Device Status Report (DSR) responses (ESC [ n ; m R)
       // This prevents garbage like ^[[5;14R from appearing on resize/focus if the shell doesn't consume it
+      // eslint-disable-next-line no-control-regex
       const filtered = data.replace(/\x1b\[\d+;\d+R/g, '');
       if (filtered) {
         onData(terminalId, filtered);
@@ -99,7 +128,7 @@ export default function TerminalComponent({
     setTimeout(() => fitAddon.fit(), 100);
 
     return () => {
-      console.log(`[Terminal] Unmounting/Disposing ${terminalId}`);
+      // console.log(`[Terminal] Unmounting/Disposing ${terminalId}`);
       term.dispose();
       terminalInstanceRef.current = null;
       fitAddonRef.current = null;
@@ -126,7 +155,7 @@ export default function TerminalComponent({
       setTimeout(() => {
         try {
           fitAddonRef.current?.fit();
-        } catch (e) {
+} catch {
           // Ignore fit errors
         }
       }, 100);
@@ -143,7 +172,7 @@ export default function TerminalComponent({
         requestAnimationFrame(() => {
           try {
             fitAddonRef.current?.fit();
-          } catch (e) {
+} catch {
             // Ignore fit errors
           }
         });
@@ -196,62 +225,77 @@ export function TerminalPanel({
   lastRefresh
 }: TerminalPanelProps) {
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-      {/* Terminal Tabs */}
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', backgroundColor: '#1e1e1e' }}>
+      {/* Terminal Tabs Header */}
       <div style={{
         display: 'flex',
-        backgroundColor: '#2d2d30',
-        borderBottom: '1px solid #3e3e42',
-        minHeight: '35px'
+        backgroundColor: '#252526', // VS Code Panel Background
+        borderBottom: 'none',
+        minHeight: '35px',
+        paddingLeft: '0px'
       }}>
-        {terminals.map((terminal) => (
-          <div
-            key={terminal.id}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              padding: '8px 12px',
-              backgroundColor: activeTerminalId === terminal.id ? '#1e1e1e' : 'transparent',
-              borderRight: '1px solid #3e3e42',
-              cursor: 'pointer',
-              position: 'relative'
-            }}
-            onClick={() => onTerminalChange(terminal.id)}
-          >
-            <span style={{
-              fontSize: '13px',
-              color: '#cccccc',
-              marginRight: '8px'
-            }}>
-              {terminal.name}
-            </span>
-            {terminals.length > 1 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onTerminalClose(terminal.id);
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#cccccc',
-                  cursor: 'pointer',
-                  padding: '2px',
-                  borderRadius: '2px',
-                  fontSize: '12px'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#3e3e42';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                ×
-              </button>
-            )}
-          </div>
-        ))}
+        {terminals.map((terminal) => {
+          const isActive = activeTerminalId === terminal.id;
+          return (
+            <div
+              key={terminal.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '0 10px',
+                backgroundColor: isActive ? '#1e1e1e' : 'transparent', // Active matches editor bg
+                borderTop: isActive ? '1px solid #007fd4' : '1px solid transparent', // VS Code Active Tab Border
+                borderRight: '1px solid #252526',
+                cursor: 'pointer',
+                color: isActive ? '#ffffff' : '#969696',
+                fontSize: '11px',
+                textTransform: 'uppercase',
+                fontWeight: isActive ? 600 : 400,
+                height: '35px',
+                position: 'relative',
+                minWidth: '120px',
+                maxWidth: '200px'
+              }}
+              onClick={() => onTerminalChange(terminal.id)}
+              className="group"
+            >
+              <span style={{
+                marginRight: 'auto',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {terminal.name}
+              </span>
+              {terminals.length > 1 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTerminalClose(terminal.id);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'inherit',
+                    cursor: 'pointer',
+                    padding: '2px',
+                    borderRadius: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginLeft: '6px',
+                    opacity: isActive ? 1 : 0, // Only show close on active or hover (via group-hover logic if strictly css, here simplified)
+                  }}
+                  className="hover:bg-[#3fb950] hover:text-white" // Green fix? no, standard gray hover
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#424242'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          );
+        })}
         {onTerminalAdd && (
           <button
             onClick={onTerminalAdd}
@@ -260,27 +304,23 @@ export function TerminalPanel({
               alignItems: 'center',
               justifyContent: 'center',
               width: '35px',
+              height: '35px',
               backgroundColor: 'transparent',
               border: 'none',
-              borderRight: '1px solid #3e3e42',
               cursor: 'pointer',
-              color: '#cccccc'
+              color: '#c5c5c5'
             }}
             title="New Terminal"
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#3e3e42';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#ffffff'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#c5c5c5'; }}
           >
-            +
+            <Plus size={16} />
           </button>
         )}
       </div>
 
       {/* Terminal Content */}
-      <div style={{ flex: 1, position: 'relative' }}>
+      <div style={{ flex: 1, position: 'relative', backgroundColor: '#1e1e1e' }}>
         {terminals.map((terminal) => (
           <div
             key={terminal.id}
@@ -290,7 +330,8 @@ export function TerminalPanel({
               left: 0,
               width: '100%',
               height: '100%',
-              display: activeTerminalId === terminal.id ? 'block' : 'none'
+              display: activeTerminalId === terminal.id ? 'block' : 'none',
+              padding: '4px 0 0 12px' // Padding for terminal content
             }}
           >
             <TerminalComponent

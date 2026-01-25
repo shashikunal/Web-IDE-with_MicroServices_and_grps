@@ -16,6 +16,7 @@ loader.config({ monaco });
 // that doesn't affect application functionality
 if (import.meta.env.DEV) {
   const originalError = console.error
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   console.error = (...args: any[]) => {
     if (
       typeof args[0] === 'object' &&

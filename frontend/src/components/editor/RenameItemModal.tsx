@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Edit2, AlertCircle } from 'lucide-react';
 
 interface RenameItemModalProps {
@@ -18,10 +18,14 @@ export default function RenameItemModal({
     const [error, setError] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
 
+    const resetForm = useCallback(() => {
+        setName(currentName);
+        setError('');
+    }, [currentName]);
+
     useEffect(() => {
         if (isOpen) {
-            setName(currentName);
-            setError('');
+            resetForm();
             setTimeout(() => {
                 if (inputRef.current) {
                     inputRef.current.focus();
@@ -29,7 +33,7 @@ export default function RenameItemModal({
                 }
             }, 100);
         }
-    }, [isOpen, currentName]);
+    }, [isOpen, resetForm]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -44,6 +48,7 @@ export default function RenameItemModal({
             return;
         }
 
+        // eslint-disable-next-line no-control-regex
         const invalidChars = /[<>:"/\\|?*\x00-\x1f]/g;
         if (invalidChars.test(name)) {
             setError('Name contains invalid characters');

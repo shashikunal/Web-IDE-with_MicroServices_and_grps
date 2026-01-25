@@ -5,7 +5,6 @@ interface ContextMenuProps {
     y: number;
     type: 'file' | 'folder' | 'background';
     path?: string;
-    name?: string;
     onClose: () => void;
     onAction: (action: string, path?: string) => void;
     hasClipboard?: boolean;
@@ -25,7 +24,6 @@ export default function ContextMenu({
     y,
     type,
     path,
-    name,
     onClose,
     onAction,
     hasClipboard = false

@@ -16,8 +16,6 @@ interface Tab {
 interface EditorProps {
   tabs: Tab[];
   activeTab: string;
-  onTabChange: (tabId: string) => void;
-  onTabClose: (tabId: string) => void;
   onContentChange: (tabId: string, content: string) => void;
   onSave: (tabId: string) => void;
 }
@@ -25,8 +23,6 @@ interface EditorProps {
 export default function CodeEditor({
   tabs,
   activeTab,
-  onTabChange,
-  onTabClose,
   onContentChange,
   onSave
 }: EditorProps) {
@@ -40,16 +36,26 @@ export default function CodeEditor({
     activeTabRef.current = activeTab;
   }, [activeTab]);
 
-  const handleEditorDidMount = useCallback((editor: editor.IStandaloneCodeEditor, monaco: any) => {
-    editorRef.current = editor;
+  const handleEditorWillMount = useCallback((monaco: any) => {
+    // 2. Configure Compiler Options (Linting, Targets)
+    // This must happen BEFORE the editor is mounted for defaults to apply correctly
+    configureMonaco(monaco);
 
     // 1. Enable Emmet for fast coding
     emmetHTML(monaco);
     emmetCSS(monaco);
     emmetJSX(monaco);
+  }, []);
 
-    // 2. Configure Compiler Options (Linting, Targets)
-    configureMonaco(monaco);
+  const handleEditorDidMount = useCallback((editor: editor.IStandaloneCodeEditor, monaco: any) => {
+    editorRef.current = editor;
+
+    // Force update options to ensure validation is off
+    editor.updateOptions({
+      renderValidationDecorations: 'off'
+    });
+
+
 
     // 3. Clean up default Monaco UI (Tabs, Breadcrumbs) if they interfere with our custom UI
     // Note: In some versions of Monaco, these aren't present by default in IStandaloneEditor,
@@ -61,7 +67,7 @@ export default function CodeEditor({
         node.parentElement?.querySelector('.monaco-breadcrumbs')?.remove();
         node.parentElement?.querySelector('.monaco-editor-title')?.remove();
       }
-    } catch (e) {
+} catch {
       // Ignore DOM errors
     }
 
@@ -119,6 +125,7 @@ export default function CodeEditor({
           path={activeTabData.path}
           onChange={handleChange}
           onMount={handleEditorDidMount}
+          beforeMount={handleEditorWillMount}
           theme="vs-dark"
           options={{
             ...COMMON_EDITOR_OPTIONS,

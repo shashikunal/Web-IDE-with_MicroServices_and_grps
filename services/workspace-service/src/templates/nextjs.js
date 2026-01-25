@@ -5,7 +5,7 @@ export default {
   language: 'typescript',
   entrypoint: 'sh',
   cmd: ['-c', 'tail -f /dev/null'],
-  port: 3000,
+  port: 5173,
   setupScript: 'if [ ! -f package.json ]; then npx create-next-app@latest . --use-npm --no-git --ts --eslint --tailwind --src-dir --app --import-alias "@/*" --yes; fi && npm install',
-  startCommand: 'npm run dev -- -H 0.0.0.0'
+  startCommand: 'npm run dev -- --webpack -H 0.0.0.0 -p 5173'
 };

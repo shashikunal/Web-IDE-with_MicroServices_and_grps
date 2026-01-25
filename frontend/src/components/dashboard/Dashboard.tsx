@@ -77,9 +77,10 @@ export default function Dashboard({ onSelectWorkspace, onBack }: DashboardProps)
       console.log('Delete successful');
       toast.success('Workspace deleted');
       setWorkspaceToDelete(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Delete failed:', err);
-      toast.error('Failed to delete workspace: ' + (err?.data?.message || err.message || 'Unknown error'));
+      const errorMessage = (err as { data?: { message?: string }, message?: string })?.data?.message || (err as Error)?.message || 'Unknown error';
+      toast.error('Failed to delete workspace: ' + errorMessage);
       // Keep modal open on error? Or close it? Usually keep it if we want to retry, but for now let's close or user can try again.
       // Better to close it to avoid stuck state if error is permanent.
       setWorkspaceToDelete(null);
@@ -114,7 +115,7 @@ export default function Dashboard({ onSelectWorkspace, onBack }: DashboardProps)
             </div>
             <h3 className="text-[var(--color-vs-error)] text-xl font-semibold mb-3">Failed to load workspaces</h3>
             <p className="text-[var(--color-vs-text-muted)] text-base max-w-md mx-auto mb-8 leading-relaxed">
-              {(error as any)?.data?.message || 'There was an error connecting to the server. Please try again later.'}
+              {(error as { data?: { message?: string } })?.data?.message || 'There was an error connecting to the server. Please try again later.'}
             </p>
             <button
               onClick={() => window.location.reload()}

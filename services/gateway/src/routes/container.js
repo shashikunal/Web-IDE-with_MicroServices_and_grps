@@ -3,7 +3,7 @@ import { config, redisClient, asyncHandler } from '../../../common/src/index.js'
 
 const router = express.Router();
 
-const workspaceServiceUrl = `http://localhost:${config.services.workspace.port}`;
+const workspaceServiceUrl = `http://${process.env.WORKSPACE_HOST || 'localhost'}:${config.services.workspace.port}`;
 
 router.post('/move', asyncHandler(async (req, res) => {
   const { userId, sourcePath, destinationPath } = req.body;

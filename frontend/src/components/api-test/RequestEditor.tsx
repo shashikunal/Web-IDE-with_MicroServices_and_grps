@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import AuthConfig from './AuthConfig';
 import Editor from '@monaco-editor/react';
-import { Plus, Trash2, Eye, EyeOff, FileText, Upload, X } from 'lucide-react';
+import { Upload, X } from 'lucide-react';
 import { Environment } from './ApiTestPanel'; // We will import from parent or define common types
 
 // Inline UUID generator for simple needs
@@ -136,11 +136,11 @@ export default function RequestEditor({ request, onChange, onRun, onSave, isLoad
     };
 
     // Ensure FormData structure exists
-    useEffect(() => {
+useEffect(() => {
         if (!request.formData) {
             updateField('formData', [{ id: generateId(), key: '', value: '', enabled: true, type: 'text' }]);
         }
-    }, []);
+    }, [request.formData, updateField]);
 
     return (
         <div className="flex flex-col h-full bg-[#1e1e1e] font-sans">

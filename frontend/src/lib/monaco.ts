@@ -23,7 +23,7 @@ import 'monaco-editor/esm/vs/basic-languages/shell/shell.contribution';
 // This ensures workers run in separate threads for performance
 export function setupMonacoEnv() {
     self.MonacoEnvironment = {
-        getWorker(_: any, label: string) {
+        getWorker(_: unknown, label: string) {
             if (label === 'json') {
                 return new jsonWorker();
             }
@@ -41,6 +41,81 @@ export function setupMonacoEnv() {
     };
 
     // Common industry-standard configurations
-    // @ts-ignore
-    monaco.languages.typescript.typescriptDefaults.setEagerModelSync(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tsLanguage = monaco.languages.typescript as any;
+    const tsDefaults = tsLanguage.typescriptDefaults;
+    const jsDefaults = tsLanguage.javascriptDefaults;
+
+    tsDefaults.setEagerModelSync(true);
+
+    const compilerOptions = {
+        target: tsLanguage.ScriptTarget.ESNext,
+        allowNonTsExtensions: true,
+        moduleResolution: tsLanguage.ModuleResolutionKind.NodeJs,
+        module: tsLanguage.ModuleKind.CommonJS,
+        noEmit: true,
+        esModuleInterop: true,
+        jsx: tsLanguage.JsxEmit.ReactJSX,
+        reactNamespace: 'React',
+        allowJs: true,
+        allowSyntheticDefaultImports: true,
+        typeRoots: ['node_modules/@types']
+    };
+
+    tsDefaults.setCompilerOptions(compilerOptions);
+    jsDefaults.setCompilerOptions(compilerOptions);
+
+    tsDefaults.setDiagnosticsOptions({
+        noSemanticValidation: false,
+        noSyntaxValidation: false,
+    });
+
+    // Inject React types to fix "Cannot find name 'React'" errors
+    tsDefaults.addExtraLib(
+        `
+        declare module 'react/jsx-runtime' {
+            export function jsx(type: any, props: any, key?: any): any;
+            export function jsxs(type: any, props: any, key?: any): any;
+            export const Fragment: any;
+        }
+        
+        declare module 'react' {
+            export = React;
+        }
+        
+        declare namespace React {
+            function useState<S>(initialState: S | (() => S)): [S, (newState: S | ((prevState: S) => S)) => void];
+            function useEffect(effect: () => (void | (() => void)), deps?: ReadonlyArray<any>): void;
+            function useMemo<T>(factory: () => T, deps: ReadonlyArray<any> | undefined): T;
+            function useCallback<T extends (...args: any[]) => any>(callback: T, deps: ReadonlyArray<any>): T;
+            
+            interface FunctionComponent<P = {}> {
+                (props: P, context?: any): ReactElement<any, any> | null;
+            }
+            type FC<P = {}> = FunctionComponent<P>;
+            interface ReactElement<P = any, T extends string | JSXElementConstructor<any> = string | JSXElementConstructor<any>> {
+                type: T;
+                props: P;
+                key: Key | null;
+            }
+            type Key = string | number;
+            type JSXElementConstructor<P> = ((props: P) => ReactElement<any, any> | null) | (new (props: P) => Component<any, any>);
+            class Component<P, S> {
+                constructor(props: P, context?: any);
+                setState(state: any, callback?: () => void): void;
+                render(): ReactNode;
+            }
+            type ReactNode = ReactElement | string | number | boolean | null | undefined;
+        }
+        declare global {
+            namespace JSX {
+                interface Element extends React.ReactElement<any, any> { }
+                interface IntrinsicElements {
+                    [elemName: string]: any;
+                }
+            }
+        }
+        `,
+        'file:///node_modules/@types/react/index.d.ts'
+    );
 }

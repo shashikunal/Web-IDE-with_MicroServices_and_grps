@@ -1,12 +1,32 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useSearchParams } from 'react-router-dom';
 import TemplateSelection from './components/layout/TemplateSelection';
+import { LANGUAGES, FRAMEWORKS } from './data/templates';
 import SetupScreen from './components/setup/SetupScreen';
 import Dashboard from './components/dashboard/Dashboard';
 import VSCodeIDE from './components/editor/VSCodeIDE_NEW';
 import ErrorScreen from './components/setup/ErrorScreen';
 import AuthModal from './components/auth/AuthModal';
 import type { Template, Workspace, User } from './store/api/apiSlice';
+
+const ALL_TEMPLATES = [...LANGUAGES, ...FRAMEWORKS];
+
+function getTemplateById(id: string): Template | undefined {
+  return ALL_TEMPLATES.find(t => t.id === id);
+}
+
+// Fallback for unknown templates (e.g. from future updates or custom ones)
+function createFallbackTemplate(id: string, description: string = ''): Template {
+  return {
+    id,
+    name: id.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+    language: 'javascript', // Default fallback
+    hasPreview: true, // Default to true for safety
+    description,
+    icon: '📁',
+    color: '#007acc'
+  };
+}
 
 interface WorkspaceInfo {
   userId: string;
@@ -19,107 +39,57 @@ interface WorkspaceInfo {
 function AppContent() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
-  const [workspaceInfo, setWorkspaceInfo] = useState<WorkspaceInfo | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('accessToken'));
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('accessToken'));
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [initialWorkspaceLoaded, setInitialWorkspaceLoaded] = useState(false);
 
-  useEffect(() => {
-    // Check auth on mount
-    const token = localStorage.getItem('accessToken');
-    setIsAuthenticated(!!token);
-  }, []);
+  // Derived state from URL parameters
+  const selectedTemplate = useMemo(() => {
+    const templateId = searchParams.get('template');
+    const userId = searchParams.get('userId');
 
-  function getTemplateLanguage(templateId: string): string {
-    const languageMap: Record<string, string> = {
-      'react-app': 'typescript',
-      'node-hello': 'javascript',
-      'python-flask': 'python',
-      'go-api': 'go',
-      'html-site': 'html',
-      'nextjs': 'typescript',
-      'angular': 'typescript',
-      'vue-app': 'javascript',
-      'fastapi-app': 'python',
-      'java-maven': 'java',
-      'spring-boot': 'java',
-      'dotnet': 'csharp',
-      'cpp-hello': 'cpp',
-      'c-lang': 'c',
-      'rust-lang': 'rust',
-      'ruby-lang': 'ruby',
-      'php-lang': 'php'
-    };
-    return languageMap[templateId] || 'javascript';
-  }
-
-  // Restore template from URL params on refresh
-  useEffect(() => {
-    const urlTemplateId = searchParams.get('template');
-    if (urlTemplateId && !selectedTemplate && !workspaceInfo) {
-      const template: Template = {
-        id: urlTemplateId,
-        name: urlTemplateId.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
-        language: getTemplateLanguage(urlTemplateId),
-        hasPreview: ['react-app', 'html-site', 'node-hello', 'python-flask', 'go-api', 'nextjs', 'angular', 'vue-app', 'fastapi-app', 'java-maven', 'spring-boot', 'dotnet', 'php-lang'].includes(urlTemplateId),
-        description: '',
-        icon: '📁',
-        color: '#007acc'
-      };
-      setSelectedTemplate(template);
+    // Only return a selected template if we are NOT in a full workspace view (no userId)
+    if (templateId && !userId) {
+      return getTemplateById(templateId) || createFallbackTemplate(templateId);
     }
-  }, [searchParams, selectedTemplate, workspaceInfo]);
+    return null;
+  }, [searchParams]);
 
-  // Restore workspace from URL params on refresh
-  useEffect(() => {
-    const urlUserId = searchParams.get('userId');
-    const urlPort = searchParams.get('port');
-    const urlTemplate = searchParams.get('template');
-    const urlWorkspaceId = searchParams.get('workspaceId');
-    const urlContainerId = searchParams.get('containerId');
+  const workspaceInfo = useMemo<WorkspaceInfo | null>(() => {
+    const userId = searchParams.get('userId');
+    const portStr = searchParams.get('port');
+    const templateId = searchParams.get('template');
+    const workspaceId = searchParams.get('workspaceId');
+    const containerId = searchParams.get('containerId');
 
-    if (urlUserId && urlPort && urlTemplate && urlWorkspaceId && urlContainerId && !workspaceInfo && !initialWorkspaceLoaded) {
-      const template: Template = {
-        id: urlTemplate,
-        name: urlTemplate.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
-        language: getTemplateLanguage(urlTemplate),
-        hasPreview: ['react-app', 'html-site', 'node-hello', 'python-flask', 'go-api', 'nextjs', 'angular', 'vue-app', 'fastapi-app', 'java-maven', 'spring-boot', 'dotnet', 'php-lang'].includes(urlTemplate),
-        description: 'Restored workspace',
-        icon: '📁',
-        color: '#007acc'
-      };
-
-      setWorkspaceInfo({
-        userId: urlUserId,
-        publicPort: parseInt(urlPort, 10),
-        workspaceId: urlWorkspaceId,
-        containerId: urlContainerId,
+    if (userId && portStr && templateId && workspaceId && containerId) {
+      const template = getTemplateById(templateId) || createFallbackTemplate(templateId, 'Restored workspace');
+      return {
+        userId,
+        publicPort: parseInt(portStr, 10),
+        workspaceId,
+        containerId,
         template
-      });
-      setInitialWorkspaceLoaded(true);
+      };
     }
-  }, [searchParams, workspaceInfo, initialWorkspaceLoaded]);
+    return null;
+  }, [searchParams]);
+
 
   const handleTemplateSelect = (template: Template) => {
     if (!isAuthenticated) {
       setShowAuthModal(true);
       return;
     }
-    setSelectedTemplate(template);
+    // Just navigate, let derived state handle the rest
     navigate(`/setup?template=${template.id}`);
   };
 
   const handleSetupComplete = (userId: string, publicPort: number, workspaceId: string, containerId: string) => {
+    // Just navigate, let derived state handle the rest
+    // Note: We need to know the current template ID.
+    // Since this is called from SetupScreen, selectedTemplate should be active.
     if (selectedTemplate) {
-      setWorkspaceInfo({
-        userId,
-        publicPort,
-        workspaceId,
-        containerId,
-        template: selectedTemplate
-      });
       navigate(`/workspace?userId=${userId}&port=${publicPort}&workspaceId=${workspaceId}&containerId=${containerId}&template=${selectedTemplate.id}`);
     }
   };
@@ -130,16 +100,12 @@ function AppContent() {
   };
 
   const handleWorkspaceSelect = async (workspace: Workspace) => {
-    // Convert workspace to template format
-    const template: Template = {
-      id: workspace.templateId,
-      name: workspace.templateName,
-      language: workspace.language,
-      hasPreview: ['react-app', 'html-site', 'node-hello', 'python-flask', 'go-api', 'nextjs', 'angular', 'vue-app', 'fastapi-app', 'java-maven', 'spring-boot', 'dotnet', 'php-lang'].includes(workspace.templateId),
-      description: 'Resumed workspace',
-      icon: '📁',
-      color: '#007acc'
-    };
+    // We navigate first to the workspace URL. 
+    // The ensure-running logic should ideally happen before navigation or as a check.
+    // However, if we want to preserve the "ensure running" logic:
+    // We can do it here, then navigate.
+
+    const templateId = workspace.templateId;
 
     try {
       // Ensure container is running before opening workspace
@@ -154,45 +120,20 @@ function AppContent() {
       const data = await response.json();
 
       if (data.success) {
-        // Use the updated container info from the response
-        setWorkspaceInfo({
-          userId: workspace.userId,
-          publicPort: data.publicPort || workspace.publicPort,
-          workspaceId: workspace.workspaceId,
-          containerId: data.containerId || workspace.containerId,
-          template
-        });
-        navigate(`/workspace?userId=${workspace.userId}&port=${data.publicPort || workspace.publicPort}&workspaceId=${workspace.workspaceId}&containerId=${data.containerId || workspace.containerId}&template=${workspace.templateId}`);
+        navigate(`/workspace?userId=${workspace.userId}&port=${data.publicPort || workspace.publicPort}&workspaceId=${workspace.workspaceId}&containerId=${data.containerId || workspace.containerId}&template=${templateId}`);
       } else {
         console.error('Failed to ensure container is running:', data.message);
-        // Fall back to original behavior
-        setWorkspaceInfo({
-          userId: workspace.userId,
-          publicPort: workspace.publicPort,
-          workspaceId: workspace.workspaceId,
-          containerId: workspace.containerId,
-          template
-        });
-        navigate(`/workspace?userId=${workspace.userId}&port=${workspace.publicPort}&workspaceId=${workspace.workspaceId}&containerId=${workspace.containerId}&template=${workspace.templateId}`);
+        navigate(`/workspace?userId=${workspace.userId}&port=${workspace.publicPort}&workspaceId=${workspace.workspaceId}&containerId=${workspace.containerId}&template=${templateId}`);
       }
     } catch (error) {
       console.error('Error ensuring container is running:', error);
-      // Fall back to original behavior
-      setWorkspaceInfo({
-        userId: workspace.userId,
-        publicPort: workspace.publicPort,
-        workspaceId: workspace.workspaceId,
-        containerId: workspace.containerId,
-        template
-      });
-      navigate(`/workspace?userId=${workspace.userId}&port=${workspace.publicPort}&workspaceId=${workspace.workspaceId}&containerId=${workspace.containerId}&template=${workspace.templateId}`);
+      navigate(`/workspace?userId=${workspace.userId}&port=${workspace.publicPort}&workspaceId=${workspace.workspaceId}&containerId=${workspace.containerId}&template=${templateId}`);
     }
   };
 
   const handleBackToTemplates = () => {
     navigate('/');
-    setSelectedTemplate(null);
-    setWorkspaceInfo(null);
+    // No need to clear state, navigation clears params which clears derived state
   };
 
   const handleShowDashboard = () => {

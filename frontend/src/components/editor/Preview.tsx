@@ -12,11 +12,18 @@ export default function Preview({ url, visible }: PreviewProps) {
   const [loading, setLoading] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
   const [connected, setConnected] = useState(false);
+
+  const [cacheBuster, setCacheBuster] = useState(() => Date.now());
   const [activeTab, setActiveTab] = useState<'preview' | 'api-test' | 'console'>('preview');
 
   const [displayUrl, setDisplayUrl] = useState('');
   const [randomDomain, setRandomDomain] = useState('');
   const [logs, setLogs] = useState<Array<{ type: 'info' | 'error' | 'success', message: string, timestamp: string }>>([]);
+
+  const addLog = (type: 'info' | 'error' | 'success', message: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setLogs(prev => [...prev, { type, message, timestamp }]);
+  };
 
   // Generate a deterministic domain based on the URL/Port
   React.useEffect(() => {
@@ -48,42 +55,23 @@ export default function Preview({ url, visible }: PreviewProps) {
     setDisplayUrl(randomDomain);
   }, [randomDomain]);
 
-  // Health check / Logger with robust retry
+  // Health check / Logger (Non-blocking)
   React.useEffect(() => {
     if (!visible) return;
 
     let mounted = true;
-    let attempts = 0;
-    const maxAttempts = 30; // 30 seconds timeout
 
-    const checkHealth = async () => {
-      // If we already connected successfully during this session (loading=false, error=null), 
-      // we might not need to keep polling unless we want to detect crashes.
-      // But here we want to establish initial connection.
-
+    const ping = async () => {
       try {
         await fetch(url, { method: 'GET', mode: 'no-cors' });
-
         if (mounted) {
-          addLog('success', `Connection established to ${url}`);
+          addLog('success', `Health check passed for ${url}`);
           setConnected(true);
-          setLoading(false);
-          setError(null);
         }
       } catch (err: any) {
-        attempts++;
         if (mounted) {
-          if (attempts < maxAttempts) {
-            // Keep loading, log info every 5 attempts to avoid spam
-            if (attempts % 5 === 0) {
-              addLog('info', `Waiting for server... (${attempts}/${maxAttempts})`);
-            }
-            setTimeout(checkHealth, 1000);
-          } else {
-            addLog('error', `Connection failed after ${maxAttempts}s: ${err.message || 'Network Error'}`);
-            setLoading(false);
-            setError(`Failed to connect after ${maxAttempts} seconds. The server might still be starting or has crashed.`);
-          }
+          addLog('info', `Health check (fetch) failed, but iframe may still work. (CORS/Network) - ${err.message}`);
+          // Do NOT set error state here, let the iframe try to load.
         }
       }
     };
@@ -92,20 +80,18 @@ export default function Preview({ url, visible }: PreviewProps) {
     setConnected(false);
     setError(null);
     addLog('info', `Connecting to ${url}...`);
-    checkHealth();
+
+    // Attempt one ping, but don't block
+    ping();
 
     return () => { mounted = false; };
   }, [url, retryCount, visible]);
-
-  const addLog = (type: 'info' | 'error' | 'success', message: string) => {
-    const timestamp = new Date().toLocaleTimeString();
-    setLogs(prev => [...prev, { type, message, timestamp }]);
-  };
 
   const handleRetry = () => {
     setLoading(true);
     setError(null);
     setRetryCount(prev => prev + 1);
+    setCacheBuster(Date.now());
     addLog('info', 'Reloading preview...');
   };
 
@@ -128,6 +114,17 @@ export default function Preview({ url, visible }: PreviewProps) {
   };
 
   if (!visible) return null;
+
+  if (!url) {
+    return (
+      <div className="flex flex-col h-full bg-[#1e1e1e] border-l border-[#2b2b2b] items-center justify-center text-[#858585] text-sm font-mono">
+        <div className="flex flex-col items-center gap-2">
+          <RefreshCw size={20} className="animate-spin text-[#007acc]" />
+          <span>Waiting for application to start...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-[#1e1e1e] border-l border-[#2b2b2b]">
@@ -163,46 +160,46 @@ export default function Preview({ url, visible }: PreviewProps) {
       <div className="flex-1 relative overflow-hidden bg-white">
         {activeTab === 'preview' ? (
           <>
+            {/* <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#1e1e1e] text-[#858585] z-10 pointer-events-none" style={{ opacity: loading ? 1 : 0, transition: 'opacity 0.3s' }}>
+                <RefreshCw size={24} className="animate-spin mb-3 text-[#007acc]" />
+                <span className="text-xs">Connecting...</span>
+            </div> */}
+
             {error ? (
-              <div className="flex flex-col items-center justify-center h-full bg-[#1e1e1e] text-[#cccccc] p-6 text-center">
+              <div className="flex flex-col items-center justify-center h-full bg-[#1e1e1e] text-[#cccccc] p-6 text-center absolute inset-0 z-20">
                 <div className="text-4xl mb-4">⚠️</div>
-                <div className="text-sm font-medium text-[#f48771] mb-2">Preview Error</div>
+                <div className="text-sm font-medium text-[#f48771] mb-2">Connection Issue</div>
                 <div className="text-xs text-[#858585] max-w-xs mb-4 leading-relaxed">{error}</div>
-                <button
-                  onClick={handleRetry}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-[#007acc] text-white rounded-sm text-xs hover:bg-[#0062a3] transition-colors"
-                >
-                  <RefreshCw size={12} />
-                  Retry Connection
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleRetry}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-[#007acc] text-white rounded-sm text-xs hover:bg-[#0062a3] transition-colors"
+                  >
+                    <RefreshCw size={12} />
+                    Retry
+                  </button>
+                  <button
+                    onClick={() => { setError(null); setLoading(false); }}
+                    className="px-3 py-1.5 bg-[#333] text-white rounded-sm text-xs hover:bg-[#444] transition-colors"
+                  >
+                    Show Anyway
+                  </button>
+                </div>
               </div>
-            ) : (
-              <>
-                {loading && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#1e1e1e] text-[#858585] z-10">
-                    <RefreshCw size={24} className="animate-spin mb-3 text-[#007acc]" />
-                    <span className="text-xs">Loading application...</span>
-                  </div>
-                )}
-                <iframe
-                  key={`${retryCount}-${connected}`}
-                  src={url}
-                  className={`w-full h-full border-none bg-white transition-opacity duration-300 ${loading ? 'opacity-0' : 'opacity-100'}`}
-                  title="Live Preview"
-                  sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-presentation allow-downloads"
-                  onLoad={() => {
-                    setLoading(false);
-                    setError(null);
-                    addLog('success', 'Preview loaded successfully (DOM Ready)');
-                  }}
-                  onError={() => {
-                    setLoading(false);
-                    setError('Failed to load preview. Ensure the server is running.');
-                    addLog('error', 'Preview failed to load (Iframe Error)');
-                  }}
-                />
-              </>
-            )}
+            ) : null}
+
+            <iframe
+              key={`${url}-${retryCount}`}
+              src={`${url}?t=${cacheBuster}`}
+              className="w-full h-full border-none bg-white"
+              title="Live Preview"
+              sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-presentation allow-downloads"
+              onLoad={() => {
+                setLoading(false);
+                setError(null);
+                addLog('success', 'Preview loaded (iframe onLoad)');
+              }}
+            />
           </>
         ) : activeTab === 'api-test' ? (
           <ApiTestPanel />
@@ -241,7 +238,7 @@ export default function Preview({ url, visible }: PreviewProps) {
       {/* Bottom Toolbar */}
       <div className="flex items-center justify-between h-7 bg-[#007acc] text-white px-2 select-none text-[10px]">
         <div className="flex items-center gap-2">
-          <span>Port Forward: 3000</span>
+          <span>Target: {url}</span>
           <span className="opacity-50">|</span>
           <span>Status: {loading ? 'Loading...' : error ? 'Error' : 'Running'}</span>
         </div>

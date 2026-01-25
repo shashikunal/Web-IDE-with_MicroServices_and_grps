@@ -1,5 +1,6 @@
 import nodejs from './nodejs.js';
 import react from './react.js';
+import express from './express.js';
 import nextjs from './nextjs.js';
 import python from './python.js';
 import go from './go.js';
@@ -19,6 +20,7 @@ import dotnet from './dotnet.js';
 export default {
   'node-hello': nodejs,
   'react-app': react,
+  'express-app': express,
   'nextjs': nextjs,
   'angular': angular,
   'vue-app': vue,

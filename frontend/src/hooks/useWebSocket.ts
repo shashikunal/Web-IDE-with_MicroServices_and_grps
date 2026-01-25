@@ -31,10 +31,10 @@ export function useWebSocket() {
         }
       };
 
-      ws.onclose = () => {
+ws.onclose = () => {
         setIsConnected(false);
         setConnected(false);
-        reconnectTimeoutRef.current = setTimeout(connect, 3000);
+        reconnectTimeoutRef.current = setTimeout(() => connect(), 3000);
       };
 
       ws.onerror = () => {

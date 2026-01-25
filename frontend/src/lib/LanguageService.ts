@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-empty-function */
+ 
 
 // Placeholder for LSP integration
 // Dependencies are currently being resolved to correct versions.

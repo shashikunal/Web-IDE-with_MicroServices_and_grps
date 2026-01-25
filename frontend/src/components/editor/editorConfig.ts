@@ -12,21 +12,28 @@ export const configureMonaco = (monaco: any) => {
         moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
         module: monaco.languages.typescript.ModuleKind.CommonJS,
         noEmit: true,
-        lib: ["es2021", "dom", "dom.iterable"]
+        lib: ["es2021", "dom", "dom.iterable"],
+        allowJs: true,
     });
 
-    // Disable semantic validation (linting) to remove red underlines
+    // Disable semantic validation (red underlines for missing types)
+    // This allows coding without distractions when full types are missing
     monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
         noSemanticValidation: true,
         noSyntaxValidation: false,
-        onlyValidate: false,
     });
 
     // Configure JavaScript defaults
     monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
-        jsx: monaco.languages.typescript.JsxEmit.React,
+        jsx: monaco.languages.typescript.JsxEmit.React, // or ReactJSX
         target: monaco.languages.typescript.ScriptTarget.ES2020,
         allowNonTsExtensions: true,
+        allowJs: true,
+    });
+
+    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+        noSemanticValidation: true,
+        noSyntaxValidation: false,
     });
 };
 
@@ -53,6 +60,8 @@ export const COMMON_EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions 
     bracketPairColorization: { enabled: true },
     guides: { bracketPairs: true },
     matchBrackets: 'always',
+
+    // We can enable validation now that we disabled strict semantic checks
     renderValidationDecorations: 'on',
 
     scrollbar: {

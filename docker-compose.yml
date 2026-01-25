@@ -80,6 +80,7 @@ services:
       - rabbitmq
 
   snippet-service:
+    restart: always
     build:
       context: .
       dockerfile: services/snippet-service/Dockerfile
@@ -95,6 +96,7 @@ services:
       - rabbitmq
 
   api-test-service:
+    restart: always
     build:
       context: .
       dockerfile: services/api-test-service/Dockerfile
@@ -128,6 +130,7 @@ services:
       - rabbitmq
 
   admin-service:
+    restart: always
     build:
       context: .
       dockerfile: services/admin-service/Dockerfile
@@ -185,8 +188,8 @@ services:
     ports:
       - "5174:5173"
     environment:
-      - VITE_API_URL=http://localhost:3000
-      - VITE_WS_URL=ws://localhost:3000
+      - VITE_API_URL=http://gateway:3000
+      - VITE_WS_URL=ws://gateway:3000
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

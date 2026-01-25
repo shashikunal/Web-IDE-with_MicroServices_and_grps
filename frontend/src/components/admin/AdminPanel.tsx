@@ -43,7 +43,7 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
   const { data: usersData, isLoading: usersLoading, error: usersError } = useGetAllUsersQuery(filters, {
     skip: activeTab !== 'users' || !isAdmin
   });
-  const { data: statsData, isLoading: statsLoading, error: statsError } = useGetSystemStatsQuery(undefined, {
+const { data: statsData, isLoading: statsLoading } = useGetSystemStatsQuery(undefined, {
     skip: activeTab !== 'stats' || !isAdmin
   });
 

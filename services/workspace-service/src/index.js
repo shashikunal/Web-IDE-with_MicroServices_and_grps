@@ -80,6 +80,10 @@ async function ensureApplicationRunning(container, templateId, force = false) {
              console.log(`[Container] Angular server appears to be running.`);
              return;
         }
+        if ((templateId === 'express-app' || templateId === 'node-hello') && (output.includes('node') || output.includes('nodemon'))) {
+             console.log(`[Container] Node/Express server appears to be running.`);
+             return;
+        }
     }
 
     console.log(`[Container] Starting application with: ${template.startCommand}`);
@@ -177,6 +181,31 @@ async function createContainer(userId, workspaceId, templateId) {
         console.log('[Container] Setup finished.');
       } catch (err) {
         console.error('[Container] Setup failed:', err);
+      }
+    }
+
+    // Enforce Next.js Config with Polling
+    if (templateId === 'nextjs') {
+      try {
+        const workspacePath = path.resolve(process.cwd(), 'workspaces', userId, workspaceId);
+        // Next.js (Webpack) polling config
+        const nextConfig = `/** @type {import('next').NextConfig} */
+const nextConfig = {
+  webpack: (config) => {
+    config.watchOptions = {
+      poll: 1000,
+      aggregateTimeout: 300,
+    }
+    return config
+  },
+};
+
+export default nextConfig;
+`;
+        await fs.writeFile(path.join(workspacePath, 'next.config.mjs'), nextConfig);
+        console.log('[Container] Enforced next.config.mjs with polling');
+      } catch (err) {
+        console.error('[Container] Failed to write next.config.mjs:', err);
       }
     }
 
@@ -802,15 +831,33 @@ app.post('/workspace/:workspaceId/file/move', asyncHandler(async (req, res) => {
   }
 
   try {
-    const sourceFullPath = path.join(workspace.workspacePath, sourcePath);
-    const destFullPath = path.join(workspace.workspacePath, destinationPath);
+    // Normalize paths to be relative (remove leading slashes/backslashes)
+    const safeSource = sourcePath.replace(/^[\/\\]+/, '');
+    const safeDest = destinationPath.replace(/^[\/\\]+/, '');
+
+    const sourceFullPath = path.join(workspace.workspacePath, safeSource);
+    const destFullPath = path.join(workspace.workspacePath, safeDest);
+
+    logger.info(`Attempting to move file from ${sourceFullPath} to ${destFullPath}`);
 
     await fs.mkdir(path.dirname(destFullPath), { recursive: true });
-    await fs.rename(sourceFullPath, destFullPath);
+    
+    try {
+      await fs.rename(sourceFullPath, destFullPath);
+    } catch (renameErr) {
+      if (renameErr.code === 'EXDEV') {
+        // Fallback for cross-device moves
+        await fs.copyFile(sourceFullPath, destFullPath);
+        await fs.unlink(sourceFullPath);
+      } else {
+        throw renameErr;
+      }
+    }
 
     res.json({ success: true, message: 'File moved successfully' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    logger.error(`Move file error: ${error.message}`, error);
+    res.status(500).json({ success: false, message: `Move failed: ${error.message}` });
   }
 }));
 

@@ -65,9 +65,13 @@ export default function SetupScreen({ template, onComplete, onError, onBack }: S
         await new Promise(r => setTimeout(r, 400));
         onComplete(result.userId, result.publicPort, result.workspaceId, result.containerId);
 
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Setup failed:', err);
-        onError(err?.data?.message || err?.message || 'Failed to create container');
+        const errorMessage =
+          (err as { data?: { message?: string } })?.data?.message ||
+          (err as { message?: string })?.message ||
+          'Failed to create container';
+        onError(errorMessage);
       }
     };
 

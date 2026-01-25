@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import CollectionsSidebar, { Collection, RequestItem } from './CollectionsSidebar';
 import RequestEditor from './RequestEditor';
 import ResponseViewer from './ResponseViewer';
 import HistoryPanel, { HistoryItem } from './HistoryPanel';
-import { History, LayoutList, Settings, Save } from 'lucide-react';
+import { History, LayoutList } from 'lucide-react';
 import axios from 'axios';
 
 // Inline simple UUID generator fallback
@@ -20,6 +20,15 @@ export interface Environment {
     name: string;
     variables: Record<string, string>;
 }
+
+// Get auth token for API calls - defined outside to be stable
+const getAuthHeaders = () => {
+    const token = localStorage.getItem('accessToken');
+    return {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+    };
+};
 
 export default function ApiTestPanel() {
     const [activeRequest, setActiveRequest] = useState<any>({
@@ -44,20 +53,7 @@ export default function ApiTestPanel() {
     const [environments, setEnvironments] = useState<Environment[]>([]);
     const [activeEnvId, setActiveEnvId] = useState<string | null>(null);
 
-    // Get auth token for API calls
-    const getAuthHeaders = () => {
-        const token = localStorage.getItem('accessToken');
-        return {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        };
-    };
-
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         try {
             const headers = getAuthHeaders();
 
@@ -85,7 +81,11 @@ export default function ApiTestPanel() {
         } catch (e) {
             console.error('Failed to load API test data', e);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
     // Variable Substitution
     const substituteVariables = (text: string) => {
@@ -93,7 +93,7 @@ export default function ApiTestPanel() {
         const env = environments.find(e => (e.id === activeEnvId || (e as any)._id === activeEnvId));
         if (!env) return text;
 
-        let vars = env.variables;
+        const vars = env.variables;
         // Handle Map coming from backend? Axios usually converts Map to Object if JSON
         // Our backend schema has `variables: { type: Map, of: String }` which mongoose output as object usually.
 
@@ -121,7 +121,7 @@ export default function ApiTestPanel() {
                 if (activeRequest.bodyType === 'json') {
                     try {
                         data = JSON.parse(substituteVariables(activeRequest.body) || '{}');
-                    } catch (e) {
+                    } catch {
                         data = activeRequest.body;
                     }
                 } else if (activeRequest.bodyType === 'form-data') {

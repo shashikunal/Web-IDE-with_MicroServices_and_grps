@@ -8,7 +8,7 @@ RUN cd /common-src && npm install --production && mkdir -p /common/src && cp -r 
 FROM node:20-alpine
 
 # Install build dependencies for node-pty
-RUN apk add --no-cache python3 make g++ libc-dev
+RUN apk add --no-cache python3 make g++ libc-dev docker-cli
 
 WORKDIR /app
 

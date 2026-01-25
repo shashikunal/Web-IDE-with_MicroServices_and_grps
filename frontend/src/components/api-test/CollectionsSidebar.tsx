@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Folder, FolderOpen, FileJson, Plus, MoreVertical, Trash2, Edit2 } from 'lucide-react';
+import { Folder, FolderOpen, Plus, Trash2 } from 'lucide-react';
 
 export interface Collection {
     _id: string;

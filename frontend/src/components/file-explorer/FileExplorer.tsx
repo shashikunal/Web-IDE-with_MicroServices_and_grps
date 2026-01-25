@@ -1,11 +1,10 @@
-import React, { useMemo, useRef, useEffect } from 'react';
+import { useMemo, useRef, useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import { Tree, TreeApi } from 'react-arborist';
 import type { FileItem } from '../../store/api/apiSlice';
 import clsx from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import {
   ChevronRight,
-  ChevronDown,
   File,
   Folder,
   FolderOpen,
@@ -21,13 +20,13 @@ interface FileExplorerProps {
   onFileSelect: (file: FileItem) => void;
   onFolderToggle: (path: string) => void;
   expandedFolders: Set<string>;
-  onContextMenu: (e: React.MouseEvent, type: 'file' | 'folder' | 'background', path?: string, name?: string) => void;
+  onContextMenu: (e: MouseEvent, type: 'file' | 'folder' | 'background', path?: string, name?: string) => void;
   onMove?: (src: string, dest: string) => void;
   className?: string;
 }
 
 // Modern file type colors and icons
-const FILE_TYPE_CONFIG: Record<string, { icon: React.ReactNode; color: string }> = {
+const FILE_TYPE_CONFIG: Record<string, { icon: ReactNode; color: string }> = {
   // JavaScript/TypeScript
   js: { icon: <FileCode size={16} />, color: '#f7df1e' },
   jsx: { icon: <FileCode size={16} />, color: '#61dafb' },
@@ -64,7 +63,7 @@ const FILE_TYPE_CONFIG: Record<string, { icon: React.ReactNode; color: string }>
   default: { icon: <File size={16} />, color: '#858585' }
 };
 
-function getFileIcon(name: string, type: 'file' | 'directory', isOpen?: boolean): { icon: React.ReactNode; color: string } {
+function getFileIcon(name: string, type: 'file' | 'directory', isOpen?: boolean): { icon: ReactNode; color: string } {
   if (type === 'directory') {
     return {
       icon: isOpen ? <FolderOpen size={16} strokeWidth={1.5} /> : <Folder size={16} strokeWidth={1.5} />,
@@ -95,13 +94,12 @@ export default function FileExplorer({
       }));
     };
 
-    const root = files[0];
-    return root?.children ? normalize(root.children) : [];
+    return normalize(files);
   }, [files]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const treeRef = useRef<TreeApi<FileItem>>(null);
-  const [dimensions, setDimensions] = React.useState({ width: 0, height: 0 });
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -168,7 +166,7 @@ export default function FileExplorer({
             }
             onFolderToggle(id);
           }}
-          onMove={async ({ dragIds, parentId, index }) => {
+          onMove={async ({ dragIds, parentId }) => {
             if (onMove && dragIds.length > 0) {
               const src = dragIds[0];
               const fileName = src.split('/').pop();
