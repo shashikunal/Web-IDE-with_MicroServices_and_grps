@@ -16,6 +16,7 @@ import java from './java.js';
 import springboot from './springboot.js';
 import angular from './angular.js';
 import dotnet from './dotnet.js';
+import django from './django.js';
 
 export default {
   'node-hello': nodejs,
@@ -24,7 +25,8 @@ export default {
   'nextjs': nextjs,
   'angular': angular,
   'vue-app': vue,
-  'python-flask': python,
+  'python-core': python,
+  'django': django,
   'fastapi-app': fastapi,
   'go-api': go,
   'cpp-hello': cpp,

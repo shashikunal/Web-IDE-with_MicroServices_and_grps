@@ -36,115 +36,133 @@ export default function TerminalComponent({
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
-
-  // Track if terminal has been initialized to prevent re-creation
   const initializedRef = useRef(false);
 
   useEffect(() => {
-    if (initializedRef.current) return;
-    if (!terminalRef.current) return;
-
-    // console.log(`[Terminal] Mounting ${terminalId}`);
-
-    const term = new Terminal({
-      cursorBlink: true,
-      cursorStyle: 'bar',
-      cursorWidth: 2,
-      fontSize: 14, // Slightly larger font
-      fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
-      theme: {
-        background: '#181818',
-        foreground: '#cccccc',
-        cursor: '#3b82f6', // Bright blue cursor
-        selectionBackground: '#264f78',
-        black: '#000000',
-        red: '#e06c75',
-        green: '#98c379',
-        yellow: '#e5c07b',
-        blue: '#61afef',
-        magenta: '#c678dd',
-        cyan: '#56b6c2',
-        white: '#abb2bf',
-        brightBlack: '#5c6370',
-        brightRed: '#e06c75',
-        brightGreen: '#98c379',
-        brightYellow: '#e5c07b',
-        brightBlue: '#61afef',
-        brightMagenta: '#c678dd',
-        brightCyan: '#56b6c2',
-        brightWhite: '#ffffff',
-      },
-      convertEol: true,
-      macOptionIsMeta: true,
-      rightClickSelectsWord: true,
-      scrollback: 2000,
-      allowProposedApi: true
-    });
-
-    const fitAddon = new FitAddon();
-    term.loadAddon(fitAddon);
-
-    term.open(terminalRef.current);
-    fitAddon.fit();
-
-    // Write welcome message immediately if new session
-    if (!initialData) {
-      term.write(WELCOME_MESSAGE);
-    } else {
-      setTimeout(() => {
-        term.write(initialData);
-      }, 50);
+    if (!terminalRef.current) {
+      console.warn(`[Terminal] Ref not ready for ${terminalId}`);
+      return;
     }
 
-    // Restore/Refresh logic
-    if (lastRefresh && initialData) {
-      term.clear();
-      term.write(initialData);
-    }
+    if (!initializedRef.current) {
+      try {
+        const term = new Terminal({
+          cursorBlink: true,
+          cursorStyle: 'bar',
+          cursorWidth: 2,
+          fontSize: 14,
+          fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
+          theme: {
+            background: '#181818',
+            foreground: '#cccccc',
+            cursor: '#3b82f6',
+            selectionBackground: '#264f78',
+            black: '#000000',
+            red: '#e06c75',
+            green: '#98c379',
+            yellow: '#e5c07b',
+            blue: '#61afef',
+            magenta: '#c678dd',
+            cyan: '#56b6c2',
+            white: '#abb2bf',
+            brightBlack: '#5c6370',
+            brightRed: '#e06c75',
+            brightGreen: '#98c379',
+            brightYellow: '#e5c07b',
+            brightBlue: '#61afef',
+            brightMagenta: '#c678dd',
+            brightCyan: '#56b6c2',
+            brightWhite: '#ffffff',
+          },
+          convertEol: true,
+          macOptionIsMeta: true,
+          rightClickSelectsWord: true,
+          scrollback: 2000,
+          allowProposedApi: true
+        });
 
-    term.onData((data) => {
-      // Filter out Device Status Report (DSR) responses (ESC [ n ; m R)
-      // This prevents garbage like ^[[5;14R from appearing on resize/focus if the shell doesn't consume it
-      // eslint-disable-next-line no-control-regex
-      const filtered = data.replace(/\x1b\[\d+;\d+R/g, '');
-      if (filtered) {
-        onData(terminalId, filtered);
+        const fitAddon = new FitAddon();
+        term.loadAddon(fitAddon);
+
+        term.open(terminalRef.current);
+        fitAddon.fit();
+
+        if (!initialData) {
+          term.write(WELCOME_MESSAGE);
+        } else {
+          setTimeout(() => {
+            term.write(initialData);
+          }, 50);
+        }
+
+        if (lastRefresh && initialData) {
+          term.clear();
+          term.write(initialData);
+        }
+
+        term.onData((data) => {
+          const filtered = data.replace(/\x1b\[\d+;\d+R/g, '');
+          if (filtered) {
+            onData(terminalId, filtered);
+          }
+        });
+
+        term.onResize((size) => {
+          console.log(`[Terminal] Resized ${terminalId} to ${size.cols}x${size.rows}`);
+          onResize(terminalId, size.cols, size.rows);
+        });
+
+        terminalInstanceRef.current = term;
+        fitAddonRef.current = fitAddon;
+        initializedRef.current = true;
+
+        setTimeout(() => fitAddon.fit(), 100);
+
+      } catch (err) {
+        console.error(`[Terminal] Failed to initialize ${terminalId}:`, err);
       }
-    });
-
-    if (onReady) {
-      onReady(terminalId, { write: (data) => term.write(data) });
     }
 
-    term.onResize((size) => {
-      onResize(terminalId, size.cols, size.rows);
-    });
-
-    terminalInstanceRef.current = term;
-    fitAddonRef.current = fitAddon;
-    initializedRef.current = true;
-
-    // Initial resize
-    setTimeout(() => fitAddon.fit(), 100);
+    // Always call onReady if we have a valid terminal instance
+    // This handles cases where onReady callback reference updates or delayed mounting
+    if (initializedRef.current && terminalInstanceRef.current && onReady) {
+      console.log(`[Terminal] Calling onReady for ${terminalId}`);
+      onReady(terminalId, { write: (data) => terminalInstanceRef.current?.write(data) });
+    }
 
     return () => {
-      // console.log(`[Terminal] Unmounting/Disposing ${terminalId}`);
-      term.dispose();
-      terminalInstanceRef.current = null;
-      fitAddonRef.current = null;
-      initializedRef.current = false;
+      // Do no dispose purely on dependency change to keep terminal alive across prop updates
+      // Only dispose if component unmounts (but React doesn't distinguish easily without ref check or empty dep array)
+      // However, since we track initializedRef, we can't easily dispose and re-init in proper cycle without refactoring to use a separate effect for lifecycle vs props.
+      // Current assumption: TerminalComponent lifecycle matches the tab/pane lifecycle.
+      // If we unmount, we should dispose. But if we re-render, we don't.
+      // The cleanup function runs on re-render too.
+      // If we dispose here, we break the terminal.
+      // So we should NOT dispose here unless we re-initialize.
+      // But initializedRef prevents re-initialization.
+      // So we should NOT dispose here.
+      // Real unmount cleanup is tricky in this pattern using initializedRef.
+      // Ideally we use empty deps [] for creation/cleanup.
     };
-    // Exclude initialData from dependencies to prevent re-mounting on data updates
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [terminalId, onData, onResize, onReady]);
+
+  // Clean up on unmount ONLY
+  useEffect(() => {
+    return () => {
+      if (terminalInstanceRef.current) {
+        // console.log(`[Terminal] Disposing ${terminalId}`);
+        terminalInstanceRef.current.dispose();
+        terminalInstanceRef.current = null;
+        fitAddonRef.current = null;
+        initializedRef.current = false;
+      }
+    };
+  }, []);
 
   // Handle manual refresh/restore request
   useEffect(() => {
     if (initializedRef.current && terminalInstanceRef.current && initialData && lastRefresh) {
-      // console.log(`[Terminal] Refreshing/Restoring content for ${terminalId}`);
-      // terminalInstanceRef.current.clear(); // Removed to prevent blanking
       terminalInstanceRef.current.write(initialData);
-      // Force fit
       setTimeout(() => fitAddonRef.current?.fit(), 50);
     }
   }, [lastRefresh, initialData, terminalId]);
@@ -155,24 +173,23 @@ export default function TerminalComponent({
       setTimeout(() => {
         try {
           fitAddonRef.current?.fit();
-} catch {
+        } catch {
           // Ignore fit errors
         }
       }, 100);
     }
   }, [isActive, visible]);
 
-  // Auto-resize when container size changes (e.g. sidebar toggle)
+  // Auto-resize when container size changes
   useEffect(() => {
     if (!terminalRef.current || !fitAddonRef.current) return;
 
     const observer = new ResizeObserver(() => {
-      // Only fit if visible and has dimensions
       if (visible && terminalRef.current && terminalRef.current.clientWidth > 0) {
         requestAnimationFrame(() => {
           try {
             fitAddonRef.current?.fit();
-} catch {
+          } catch {
             // Ignore fit errors
           }
         });
@@ -180,7 +197,6 @@ export default function TerminalComponent({
     });
 
     observer.observe(terminalRef.current);
-
     return () => observer.disconnect();
   }, [visible]);
 

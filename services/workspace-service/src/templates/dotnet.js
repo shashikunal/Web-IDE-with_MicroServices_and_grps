@@ -22,15 +22,9 @@ export default {
   buildTool: 'dotnet',
   runtime: '.NET CLR',
   entrypoint: 'sh',
-  cmd: ['-c', 'dotnet watch run --urls http://0.0.0.0:5000'],
+  cmd: ['-c', 'tail -f /dev/null'],
   port: 5000,
-  files: {
-    'Program.cs': `var builder = WebApplication.CreateBuilder(args);
-var app = builder.Build();
-
-app.MapGet("/", () => "Hello from ASP.NET Core!");
-
-app.Run();`
-  },
-  setupScript: 'if [ ! -f Program.cs ]; then dotnet new web -n App -o . --force; fi'
+  files: {},
+  setupScript: 'if [ ! -f App.csproj ]; then dotnet new web -n App -o . --force; fi',
+  startCommand: 'dotnet watch run --urls http://0.0.0.0:5000'
 };

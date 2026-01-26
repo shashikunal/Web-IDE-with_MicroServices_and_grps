@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Execution Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #cccccc;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #252526;
+            border-radius: 8px;
+            border: 1px solid #3e3e42;
+        }
+        h2 {
+            color: #4ec9b0;
+            margin-top: 0;
+        }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1177bb;
+        }
+        .output {
+            background: #1e1e1e;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            min-height: 100px;
+            border: 1px solid #3e3e42;
+        }
+        .success {
+            color: #4ec9b0;
+        }
+        .error {
+            color: #f48771;
+        }
+        .loading {
+            color: #dcdcaa;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 WASM Execution Test Suite</h1>
+    <p>Testing client-side code execution with WebAssembly</p>
+
+    <div class="test-section">
+        <h2>Python (Pyodide)</h2>
+        <button onclick="testPython()">Run Python Test</button>
+        <div id="python-output" class="output">Click "Run Python Test" to execute...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>JavaScript (Native)</h2>
+        <button onclick="testJavaScript()">Run JavaScript Test</button>
+        <div id="js-output" class="output">Click "Run JavaScript Test" to execute...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>C++ (JSCPP)</h2>
+        <button onclick="testCpp()">Run C++ Test</button>
+        <div id="cpp-output" class="output">Click "Run C++ Test" to execute...</div>
+    </div>
+
+    <script type="module">
+        import { executeCode, isWasmSupported } from './wasmRunners.ts';
+
+        window.testPython = async function() {
+            const output = document.getElementById('python-output');
+            output.className = 'output loading';
+            output.textContent = 'Loading Pyodide (first run may take 10-20 seconds)...';
+            
+            const code = `
+print("Hello from Python!")
+for i in range(5):
+    print(f"Count: {i}")
+result = sum([1, 2, 3, 4, 5])
+print(f"Sum: {result}")
+`;
+            
+            try {
+                const result = await executeCode('python', code);
+                output.className = result.success ? 'output success' : 'output error';
+                output.textContent = result.success 
+                    ? `✓ Success (${result.executionTime?.toFixed(2)}ms)\n\n${result.output}`
+                    : `✗ Error\n\n${result.error}`;
+            } catch (error) {
+                output.className = 'output error';
+                output.textContent = `✗ Exception\n\n${error.message}`;
+            }
+        };
+
+        window.testJavaScript = async function() {
+            const output = document.getElementById('js-output');
+            output.className = 'output loading';
+            output.textContent = 'Executing JavaScript...';
+            
+            const code = `
+console.log("Hello from JavaScript!");
+const numbers = [1, 2, 3, 4, 5];
+console.log("Numbers:", numbers);
+const sum = numbers.reduce((a, b) => a + b, 0);
+console.log("Sum:", sum);
+return sum;
+`;
+            
+            try {
+                const result = await executeCode('javascript', code);
+                output.className = result.success ? 'output success' : 'output error';
+                output.textContent = result.success 
+                    ? `✓ Success (${result.executionTime?.toFixed(2)}ms)\n\n${result.output}`
+                    : `✗ Error\n\n${result.error}`;
+            } catch (error) {
+                output.className = 'output error';
+                output.textContent = `✗ Exception\n\n${error.message}`;
+            }
+        };
+
+        window.testCpp = async function() {
+            const output = document.getElementById('cpp-output');
+            output.className = 'output loading';
+            output.textContent = 'Loading JSCPP (first run may take a few seconds)...';
+            
+            const code = `
+#include <iostream>
+using namespace std;
+
+int main() {
+    cout << "Hello from C++!" << endl;
+    
+    int sum = 0;
+    for(int i = 1; i <= 5; i++) {
+        sum += i;
+        cout << "i = " << i << ", sum = " << sum << endl;
+    }
+    
+    return 0;
+}
+`;
+            
+            try {
+                const result = await executeCode('cpp', code);
+                output.className = result.success ? 'output success' : 'output error';
+                output.textContent = result.success 
+                    ? `✓ Success (${result.executionTime?.toFixed(2)}ms)\n\n${result.output}`
+                    : `✗ Error\n\n${result.error}`;
+            } catch (error) {
+                output.className = 'output error';
+                output.textContent = `✗ Exception\n\n${error.message}`;
+            }
+        };
+
+        // Show supported languages
+        console.log('WASM Support Check:');
+        ['python', 'javascript', 'cpp', 'c', 'ruby', 'php', 'java'].forEach(lang => {
+            console.log(`${lang}: ${isWasmSupported(lang) ? '✓' : '✗'}`);
+        });
+    </script>
+</body>
+</html>

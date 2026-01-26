@@ -1,16 +1,91 @@
 export default {
-  id: 'python-flask',
+  id: 'python-core',
   name: 'Python',
-  type: 'language', // Python is a language, although Flask is a framework. The template is "Flask App" but the user categorized Python under "Interpreted Languages" in their request. I'll stick to 'language' for standard python or 'framework' for flask. The ID says 'python-flask' but name is 'Python'. Let's strictly follow the user's mental model: Python is a Language. Flask would be a Framework. I'll keep this as a language example for now or split if needed. The user's prompt listed "Python" under Interpreted Languages.
+  type: 'language',
   image: 'python:3.11-alpine',
   language: 'python',
   compiler: null, // Interpreted
   interpreter: 'python3',
   runtime: 'python',
   entrypoint: 'sh',
-  cmd: ['-c', 'pip install flask && python app.py'],
-  port: 5000,
+  cmd: ['-c', 'tail -f /dev/null'], // Keep container alive for terminal access
+  port: null, // No web server - core Python only
   files: {
-    'app.py': 'from flask import Flask\napp = Flask(__name__)\n@app.route("/")\ndef hello(): return "Hello from Python Flask!"\nif __name__ == "__main__": app.run(host="0.0.0.0", port=5000)'
+    'main.py': `# Python 3.11 - Core Interpreter
+# Write your Python code here
+
+def greet(name):
+    return f"Hello, {name}!"
+
+def main():
+    print("Welcome to Python!")
+    print(greet("World"))
+    
+    # Example: Basic calculations
+    numbers = [1, 2, 3, 4, 5]
+    total = sum(numbers)
+    print(f"Sum of {numbers} = {total}")
+    
+    # Example: List comprehension
+    squares = [x**2 for x in numbers]
+    print(f"Squares: {squares}")
+
+if __name__ == "__main__":
+    main()
+`,
+    'README.md': `# Python Workspace
+
+This is a core Python 3.11 environment for running Python scripts.
+
+## Running Your Code
+
+### Option 1: WASM (Browser-based - Instant)
+Click the "Run Code" button in the editor to execute your code instantly using Pyodide WASM.
+- ✅ Instant execution
+- ✅ No container startup time
+- ✅ Full Python 3.11 support
+- ✅ Package installation via micropip
+
+### Option 2: Container (Backend)
+Run commands in the terminal:
+\`\`\`bash
+python main.py
+\`\`\`
+
+## Installing Packages
+
+### For WASM execution:
+Use the "Packages" button to install Python packages via micropip.
+
+### For Container execution:
+\`\`\`bash
+pip install package-name
+\`\`\`
+
+## Examples
+
+### Hello World
+\`\`\`python
+print("Hello, World!")
+\`\`\`
+
+### Input/Output
+\`\`\`python
+name = input("Enter your name: ")
+print(f"Hello, {name}!")
+\`\`\`
+
+### File Operations
+\`\`\`python
+# Write to file
+with open('output.txt', 'w') as f:
+    f.write("Hello from Python!")
+
+# Read from file
+with open('output.txt', 'r') as f:
+    content = f.read()
+    print(content)
+\`\`\`
+`
   }
 };

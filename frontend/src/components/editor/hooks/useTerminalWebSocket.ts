@@ -25,7 +25,8 @@ const START_COMMANDS: Record<string, string> = {
     'vue-app': 'npm run dev -- --host 0.0.0.0',
 
     // Python Frameworks
-    'python-flask': 'python app.py',
+    'python-core': 'python main.py',
+    'django': 'python manage.py runserver 0.0.0.0:8000',
     'fastapi-app': 'uvicorn main:app --host 0.0.0.0 --port 8000 --reload',
 
     // Go
@@ -137,7 +138,7 @@ export function useTerminalWebSocket({
         });
     }, [terminals, userId, connectTerminal]);
 
-useEffect(() => {
+    useEffect(() => {
         return () => {
             const sockets = socketsRef.current;
             sockets.forEach(ws => ws.close());

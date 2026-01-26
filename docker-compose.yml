@@ -27,6 +27,18 @@ services:
       - RABBITMQ_DEFAULT_USER=guest
       - RABBITMQ_DEFAULT_PASS=guest
 
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: webide_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   auth-service:
     restart: always
     build:
@@ -199,3 +211,4 @@ volumes:
   mongodb_data:
   redis_data:
   rabbitmq_data:
+  postgres_data:

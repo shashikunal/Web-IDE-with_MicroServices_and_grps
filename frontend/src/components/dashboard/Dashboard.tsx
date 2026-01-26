@@ -188,7 +188,7 @@ export default function Dashboard({ onSelectWorkspace, onBack }: DashboardProps)
                     <div className="w-12 h-12 rounded-xl bg-[var(--color-vs-activity)] flex items-center justify-center text-2xl flex-shrink-0 shadow-soft">
                       {ws.templateName === 'react-app' ? '⚛️' :
                         ws.templateName === 'node-hello' ? '🟢' :
-                          ws.templateName === 'python-flask' ? '🐍' :
+                          ws.templateName === 'python-core' ? '🐍' :
                             ws.templateName === 'go-api' ? '🔵' :
                               ws.templateName === 'cpp-hello' ? '⚙️' :
                                 ws.templateName === 'html-site' ? '📄' :

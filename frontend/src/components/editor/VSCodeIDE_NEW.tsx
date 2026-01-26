@@ -30,6 +30,9 @@ import CreateItemModal from './CreateItemModal';
 import RenameItemModal from './RenameItemModal';
 import DeleteItemModal from './DeleteItemModal';
 import ApiTestPanel from '../api-test/ApiTestPanel';
+import ConsoleRunner from './ConsoleRunner';
+import { COMMANDS } from '../../data/commands';
+import PerformanceDashboard from '../dashboard/PerformanceDashboard';
 
 // Extracted components
 import TitleBar from './TitleBar';
@@ -144,6 +147,14 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
   const [renameCurrentName, setRenameCurrentName] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteData, setDeleteData] = useState<{ path: string; name: string; type: 'file' | 'folder' } | null>(null);
+  const [showPerformanceDashboard, setShowPerformanceDashboard] = useState(false);
+  const [executionMetrics, setExecutionMetrics] = useState<Array<{
+    language: string;
+    timestamp: number;
+    executionTime: number;
+    success: boolean;
+    codeLength: number;
+  }>>([]);
 
   // File Tree State
   const [fileTree, setFileTree] = useState<FileItem | null>(null);
@@ -163,16 +174,47 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
   // Refs
   const autoSaveTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
+  // Terminals to connect (include runner for non-preview templates)
+  const terminalsToConnect = useMemo(() => {
+    if (!template.hasPreview) {
+      return [...terminals, { id: 'runner', name: 'Runner', isActive: true }];
+    }
+    return terminals;
+  }, [terminals, template.hasPreview]);
+
   // Custom Hooks
   const terminalOps = useTerminalWebSocket({
     userId,
     containerId,
-    terminals,
+    terminals: terminalsToConnect,
     templateId: template.id,
     templateName: template.name,
     publicPort,
     onConnectionChange: setIsConnected
   });
+
+  const handleRunCode = useCallback(() => {
+    console.log('[VSCodeIDE] ═══════════════════════════════════════');
+    console.log('[VSCodeIDE] handleRunCode called');
+    console.log('[VSCodeIDE] template.id:', template.id);
+    console.log('[VSCodeIDE] template.hasPreview:', template.hasPreview);
+    console.log('[VSCodeIDE] COMMANDS[template.id]:', COMMANDS[template.id]);
+    console.log('[VSCodeIDE] ═══════════════════════════════════════');
+
+    const cmd = COMMANDS[template.id];
+    if (cmd && !template.hasPreview) {
+      // Clear previous output if desired, or just space a bit
+      console.log('[VSCodeIDE] → Sending command to runner terminal:', cmd);
+      // Remove the styled output to avoid sending escape codes to the shell input
+      terminalOps.handleTerminalData('runner', cmd + '\r');
+    } else if (!cmd) {
+      console.error('[VSCodeIDE] ✗ No run command defined for template:', template.id);
+      toast.error('No run command defined for this template');
+    } else {
+      console.warn('[VSCodeIDE] ⚠ Template has preview, not using runner');
+      toast.error('This template uses preview mode, not console runner');
+    }
+  }, [template.id, template.hasPreview, terminalOps]);
 
 
 
@@ -944,14 +986,37 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
                   </div>
                 </Panel>
 
-                {showPreview && template.hasPreview && (
+                {(showPreview || !template.hasPreview) && (
                   <>
                     <PanelResizeHandle className="w-1 bg-[#2b2b2b] hover:bg-[#007acc] transition-colors" />
-                    <Panel defaultSize={50} minSize={30}>
-                      <Preview
-                        url={publicPort ? `http://localhost:${publicPort}` : ''}
-                        visible={showPreview}
-                      />
+                    <Panel defaultSize={40} minSize={30}>
+                      {template.hasPreview ? (
+                        <Preview
+                          url={publicPort ? `http://localhost:${publicPort}` : ''}
+                          visible={showPreview}
+                        />
+                      ) : (
+                        <ConsoleRunner
+                          terminalId="runner"
+                          onRun={handleRunCode}
+                          language={template.language}
+                          code={currentTab?.content || ''}
+                          useWasm={true}
+                          onData={terminalOps.handleTerminalData}
+                          onResize={terminalOps.handleTerminalResize}
+                          onReady={terminalOps.handleTerminalReady}
+                          initialData={terminalOps.terminalHistoryRef.current['runner']}
+                          onExecutionComplete={(result) => {
+                            setExecutionMetrics(prev => [...prev, {
+                              language: template.language,
+                              timestamp: Date.now(),
+                              executionTime: result.executionTime || 0,
+                              success: result.success,
+                              codeLength: currentTab?.content?.length || 0
+                            }]);
+                          }}
+                        />
+                      )}
                     </Panel>
                   </>
                 )}
@@ -1019,6 +1084,14 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
             setDeleteData(null);
           }}
           onConfirm={handleDeleteItem}
+        />
+      )}
+
+      {/* Performance Dashboard */}
+      {showPerformanceDashboard && (
+        <PerformanceDashboard
+          metrics={executionMetrics}
+          onClose={() => setShowPerformanceDashboard(false)}
         />
       )}
     </div>

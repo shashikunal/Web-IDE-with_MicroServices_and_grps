@@ -84,6 +84,11 @@ async function ensureApplicationRunning(container, templateId, force = false) {
              console.log(`[Container] Node/Express server appears to be running.`);
              return;
         }
+
+        if (templateId === 'django' && (output.includes('manage.py runserver') || output.includes('python manage.py'))) {
+             console.log(`[Container] Django server appears to be running.`);
+             return;
+        }
     }
 
     console.log(`[Container] Starting application with: ${template.startCommand}`);
@@ -209,8 +214,8 @@ export default nextConfig;
       }
     }
 
-    // Enforce Vite Config with Polling for React App
-    if (templateId === 'react-app') {
+    // Enforce Vite Config with Polling for React and Vue Apps
+    if (templateId === 'react-app' || templateId === 'vue-app') {
       try {
         const workspacePath = path.resolve(process.cwd(), 'workspaces', userId, workspaceId);
         const viteConfig = `import { defineConfig } from 'vite'
@@ -290,8 +295,10 @@ app.post('/workspace', asyncHandler(async (req, res) => {
     containerId = result.containerId;
     publicPort = result.publicPort;
   } catch (error) {
-    logger.error('Container creation failed:', error);
-    return res.status(500).json({ success: false, message: `Container creation failed: ${error.message}` });
+    logger.warn('Container creation failed (continuing without container):', error.message);
+    // Continue without container - allows WASM languages to function
+    containerId = null;
+    publicPort = 0;
   }
 
   const workspace = new Workspace({
