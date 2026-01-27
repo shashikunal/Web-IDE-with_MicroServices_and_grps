@@ -23,5 +23,6 @@ export default {
     }, null, 2),
     'index.js': 'const express = require("express");\nconst cors = require("cors");\nconst app = express();\n\napp.use(cors());\napp.get("/", (req, res) => res.send("Hello from Node.js!"));\n\napp.listen(3000, "0.0.0.0", () => console.log("Server running on port 3000"));'
   },
-  setupScript: 'npm install'
+  setupScript: 'npm install',
+  startCommand: 'npm start'
 };

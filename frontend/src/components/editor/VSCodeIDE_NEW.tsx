@@ -66,6 +66,7 @@ interface VSCodeIDEProps {
   workspaceId: string;
   containerId: string;
   publicPort: number;
+  title?: string;
   setAppState: (state: AppState | ((state: AppState) => void)) => void;
 }
 
@@ -101,7 +102,7 @@ const ACTIVITY_BAR_ITEMS = [
   { id: 'api-test', icon: Zap, label: 'API Tester' },
 ];
 
-export default function VSCodeIDE({ template, userId, workspaceId, containerId, publicPort, setAppState }: VSCodeIDEProps) {
+export default function VSCodeIDE({ template, userId, workspaceId, containerId, publicPort, title, setAppState }: VSCodeIDEProps) {
   const navigate = useNavigate();
 
   // UI State
@@ -199,14 +200,33 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
     console.log('[VSCodeIDE] template.id:', template.id);
     console.log('[VSCodeIDE] template.hasPreview:', template.hasPreview);
     console.log('[VSCodeIDE] COMMANDS[template.id]:', COMMANDS[template.id]);
+    console.log('[VSCodeIDE] terminalOps:', terminalOps);
+    console.log('[VSCodeIDE] terminalOps.handleTerminalData:', terminalOps?.handleTerminalData);
+
+    // Check WebSocket states
+    if (terminalOps?.socketsRef?.current) {
+      console.log('[VSCodeIDE] WebSocket states:');
+      terminalOps.socketsRef.current.forEach((ws, terminalId) => {
+        console.log(`  - ${terminalId}: ${ws.readyState} (${ws.readyState === WebSocket.OPEN ? 'OPEN' : ws.readyState === WebSocket.CONNECTING ? 'CONNECTING' : ws.readyState === WebSocket.CLOSING ? 'CLOSING' : 'CLOSED'})`);
+      });
+    }
     console.log('[VSCodeIDE] ═══════════════════════════════════════');
 
     const cmd = COMMANDS[template.id];
     if (cmd && !template.hasPreview) {
       // Clear previous output if desired, or just space a bit
       console.log('[VSCodeIDE] → Sending command to runner terminal:', cmd);
-      // Remove the styled output to avoid sending escape codes to the shell input
-      terminalOps.handleTerminalData('runner', cmd + '\r');
+      console.log('[VSCodeIDE] → Full command with newline:', cmd + '\r');
+
+      // Check if terminalOps.handleTerminalData exists
+      if (terminalOps && terminalOps.handleTerminalData) {
+        console.log('[VSCodeIDE] ✓ Calling terminalOps.handleTerminalData("runner", ...)');
+        terminalOps.handleTerminalData('runner', cmd + '\r');
+        console.log('[VSCodeIDE] ✓ Command sent successfully');
+      } else {
+        console.error('[VSCodeIDE] ✗ terminalOps.handleTerminalData is not available!');
+        toast.error('Terminal not ready. Please wait...');
+      }
     } else if (!cmd) {
       console.error('[VSCodeIDE] ✗ No run command defined for template:', template.id);
       toast.error('No run command defined for this template');
@@ -305,12 +325,13 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
   const fetchFolderContent = useCallback(async (path: string) => {
     const normalizedPath = path.replace(/^\//, '');
     try {
-      const queryPath = normalizedPath || '/';
+      const queryPath = normalizedPath || '.';
       const response = await fetch(`/api/workspaces/${workspaceId}/files?path=${encodeURIComponent(queryPath)}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }
       });
+
       if (response.ok) {
         const data = await response.json();
         const items = (data.files || []).map((item: FileItem) => ({
@@ -322,13 +343,9 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
     } catch (err) {
       console.error('Failed to fetch folder:', err);
     }
-  }, [workspaceId, updateFolderChildren]);
+  }, [workspaceId, userId, updateFolderChildren]);
 
-  useEffect(() => {
-    if (fileTree && (!fileTree.children || fileTree.children.length === 0)) {
-      fetchFolderContent(fileTree.path);
-    }
-  }, [fileTree, fetchFolderContent]);
+
 
   const handleFolderToggle = useCallback(async (path: string) => {
     if (!path) return;
@@ -807,11 +824,11 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
 
       {/* Title Bar - Extracted Component */}
       <TitleBar
-        templateName={template.name}
+        templateName={title || template.name}
         username={username}
         showProfileMenu={showProfileMenu}
         onToggleProfileMenu={() => setShowProfileMenu(!showProfileMenu)}
-        onSave={() => handleMenuAction('save')}
+        onSave={() => activeTab && handleSave(activeTab)}
         onLogout={handleLogout}
       />
 

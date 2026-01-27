@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import UserProfile from '../auth/UserProfile';
 import type { Template } from '../../store/api/apiSlice';
+import WorkspaceConfigModal, { WorkspaceConfig } from '../setup/WorkspaceConfigModal';
 
 import { LANGUAGES, FRAMEWORKS } from '../../data/templates';
 
 interface TemplateSelectionProps {
-  onSelect: (template: Template) => void;
+  onSelect: (template: Template, config?: WorkspaceConfig) => void;
   onShowDashboard: () => void;
   onLogin: () => void;
   onLogout: () => void;
@@ -21,6 +22,7 @@ export default function TemplateSelection({
 }: TemplateSelectionProps) {
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'languages' | 'frameworks'>('languages');
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
 
   const filteredLanguages = LANGUAGES.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase()) || t.description.toLowerCase().includes(search.toLowerCase())
@@ -30,8 +32,34 @@ export default function TemplateSelection({
     t.name.toLowerCase().includes(search.toLowerCase()) || t.description.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleTemplateClick = (template: Template) => {
+    if (!isAuthenticated) {
+      onLogin();
+      return;
+    }
+    setSelectedTemplate(template);
+  };
+
+  const handleConfigConfirm = (config: WorkspaceConfig) => {
+    if (selectedTemplate) {
+      onSelect(selectedTemplate, config);
+      setSelectedTemplate(null);
+    }
+  };
+
+  const handleConfigCancel = () => {
+    setSelectedTemplate(null);
+  };
+
   return (
     <div style={{ backgroundColor: '#1e1e1e', color: '#cccccc', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
+      {selectedTemplate && (
+        <WorkspaceConfigModal
+          template={selectedTemplate}
+          onConfirm={handleConfigConfirm}
+          onCancel={handleConfigCancel}
+        />
+      )}
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px 24px 60px' }}>
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
           <UserProfile onLogout={onLogout} onLogin={onLogin} />
@@ -49,6 +77,7 @@ export default function TemplateSelection({
         </div>
 
         <div style={{ marginBottom: '40px' }}>
+          {/* Search Input */}
           <div style={{ position: 'relative', maxWidth: '500px', margin: '0 auto', marginBottom: '24px' }}>
             <svg style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', width: '20px', height: '20px', color: '#858585' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <circle cx="11" cy="11" r="8" strokeWidth={2} />
@@ -142,13 +171,13 @@ export default function TemplateSelection({
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
           gap: '16px',
-          opacity: isAuthenticated ? 1 : 0.5,
-          pointerEvents: isAuthenticated ? 'auto' : 'none'
+          opacity: isAuthenticated ? 1 : 1,
+          pointerEvents: 'auto'
         }}>
           {(activeTab === 'languages' ? filteredLanguages : filteredFrameworks).map((template) => (
             <button
               key={template.id}
-              onClick={() => onSelect(template)}
+              onClick={() => handleTemplateClick(template)}
               style={{
                 padding: '24px',
                 borderRadius: '12px',

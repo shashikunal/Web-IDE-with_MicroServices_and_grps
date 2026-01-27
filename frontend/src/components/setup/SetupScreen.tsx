@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import type { Template } from '../../store/api/apiSlice';
 import { useCreateContainerMutation } from '../../store/api/apiSlice';
 
@@ -10,6 +11,8 @@ interface SetupScreenProps {
 }
 
 export default function SetupScreen({ template, onComplete, onError, onBack }: SetupScreenProps) {
+  const location = useLocation();
+  const config = location.state?.config;
   const [currentStep, setCurrentStep] = useState('request');
   const [stepProgress, setStepProgress] = useState(0);
   const [createContainer] = useCreateContainerMutation();
@@ -39,7 +42,12 @@ export default function SetupScreen({ template, onComplete, onError, onBack }: S
         const result = await createContainer({
           language: template.language,
           templateId: template.id,
-          templateName: template.name
+          templateName: template.name,
+          title: config?.title,
+          description: config?.description,
+          cpu: config?.cpu,
+          memory: config?.memory,
+          port: config?.port
         }).unwrap();
 
         setStepProgress(40);

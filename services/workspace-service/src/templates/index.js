@@ -17,6 +17,8 @@ import springboot from './springboot.js';
 import angular from './angular.js';
 import dotnet from './dotnet.js';
 import django from './django.js';
+import csharp from './csharp.js';
+import blazor from './blazor.js';
 
 export default {
   'node-hello': nodejs,
@@ -37,5 +39,7 @@ export default {
   'html-site': html,
   'java-maven': java,
   'spring-boot': springboot,
-  'dotnet': dotnet
+  'dotnet': dotnet,
+  'csharp-console': csharp,
+  'blazor-wasm': blazor
 };

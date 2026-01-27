@@ -33,6 +33,21 @@ import templateConfigs from './templates/index.js';
 
 
 
+// Helper to parse memory string (e.g., "512m", "2g") to bytes
+function parseMemory(memStr) {
+    if (!memStr) return 0;
+    const match = memStr.toString().match(/^(\d+)([gGmMkK]?)$/);
+    if (!match) return 0;
+    const val = parseInt(match[1], 10);
+    const unit = match[2].toLowerCase();
+    switch (unit) {
+        case 'g': return val * 1024 * 1024 * 1024;
+        case 'm': return val * 1024 * 1024;
+        case 'k': return val * 1024;
+        default: return val;
+    }
+}
+
 async function ensureApplicationRunning(container, templateId, force = false) {
   const template = templateConfigs[templateId];
   if (!template || !template.startCommand) return;
@@ -105,13 +120,16 @@ async function ensureApplicationRunning(container, templateId, force = false) {
   }
 }
 
-async function createContainer(userId, workspaceId, templateId) {
+async function createContainer(userId, workspaceId, templateId, options = {}) {
   if (!docker) throw new Error('Docker not available');
 
   const template = templateConfigs[templateId];
   if (!template) throw new Error('Invalid template');
 
   const containerId = `cp-${workspaceId.slice(0, 8)}-${Date.now().toString(36)}`;
+  const cpuLimit = options.cpu || 2.0;
+  const memoryLimit = options.memory || '2g';
+  const internalPort = options.port || template.port;
 
   try {
     try {
@@ -129,10 +147,11 @@ async function createContainer(userId, workspaceId, templateId) {
       }
     }
 
+    // ...
     // Create port bindings - map container port to a random host port
     const portBindings = {};
-    if (template.port) {
-      portBindings[`${template.port}/tcp`] = [{ HostPort: '0' }]; // '0' means Docker assigns a random available port
+    if (internalPort) {
+      portBindings[`${internalPort}/tcp`] = [{ HostPort: '0' }];
     }
 
     const container = await docker.createContainer({
@@ -142,28 +161,37 @@ async function createContainer(userId, workspaceId, templateId) {
       Hostname: containerId,
       name: containerId,
       HostConfig: {
-        CpuQuota: 200000,
+        NanoCpus: cpuLimit * 1000000000, 
+        Memory: parseMemory(memoryLimit),
         AutoRemove: false,
         // Bind the specific workspace directory so npm install finds package.json
         Binds: [
           (() => {
+            let hostPath;
             if (process.env.HOST_WORKSPACES_PATH) {
-              // Start with host path, normalize backslashes to forward slashes for Docker
-              const root = process.env.HOST_WORKSPACES_PATH.replace(/\\/g, '/');
-              return `${root}/${userId}/${workspaceId}:/workspace`;
+              hostPath = `${process.env.HOST_WORKSPACES_PATH}/${userId}/${workspaceId}`;
+            } else {
+              hostPath = path.resolve(process.cwd(), 'workspaces', userId, workspaceId);
             }
-            return `${path.resolve(process.cwd(), 'workspaces', userId, workspaceId)}:/workspace`;
+            // Normalize for Windows Docker: Replace backslashes with forward slashes
+            let normalizedPath = hostPath.replace(/\\/g, '/');
+            // Ensure drive letter is lowercased (e.g. C:/... -> c:/...) which is sometimes required by Docker Desktop
+            if (normalizedPath.match(/^[A-Z]:/)) {
+               normalizedPath = normalizedPath.charAt(0).toLowerCase() + normalizedPath.slice(1);
+            }
+            return `${normalizedPath}:/workspace`;
           })()
         ],
         PortBindings: portBindings
       },
       WorkingDir: '/workspace',
-      ExposedPorts: template.port ? {
-        [`${template.port}/tcp`]: {}
+      ExposedPorts: internalPort ? {
+        [`${internalPort}/tcp`]: {}
       } : {}
     });
 
     await container.start();
+    console.log('[Container] Container started successfully');
 
     // Initialize Project & Install Dependencies
     const setupScript = template.setupScript;
@@ -188,68 +216,15 @@ async function createContainer(userId, workspaceId, templateId) {
         console.error('[Container] Setup failed:', err);
       }
     }
-
-    // Enforce Next.js Config with Polling
-    if (templateId === 'nextjs') {
-      try {
-        const workspacePath = path.resolve(process.cwd(), 'workspaces', userId, workspaceId);
-        // Next.js (Webpack) polling config
-        const nextConfig = `/** @type {import('next').NextConfig} */
-const nextConfig = {
-  webpack: (config) => {
-    config.watchOptions = {
-      poll: 1000,
-      aggregateTimeout: 300,
-    }
-    return config
-  },
-};
-
-export default nextConfig;
-`;
-        await fs.writeFile(path.join(workspacePath, 'next.config.mjs'), nextConfig);
-        console.log('[Container] Enforced next.config.mjs with polling');
-      } catch (err) {
-        console.error('[Container] Failed to write next.config.mjs:', err);
-      }
-    }
-
-    // Enforce Vite Config with Polling for React and Vue Apps
-    if (templateId === 'react-app' || templateId === 'vue-app') {
-      try {
-        const workspacePath = path.resolve(process.cwd(), 'workspaces', userId, workspaceId);
-        const viteConfig = `import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-// https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    host: true,
-    port: 5173,
-    watch: {
-      usePolling: true,
-      interval: 100,
-      binaryInterval: 300
-    }
-  }
-})
-`;
-        await fs.writeFile(path.join(workspacePath, 'vite.config.ts'), viteConfig);
-        console.log('[Container] Enforced vite.config.ts with polling');
-      } catch (err) {
-        console.error('[Container] Failed to write vite.config.ts:', err);
-      }
-    }
   
     // Start the application server if a start command is defined
     await ensureApplicationRunning(container, templateId, true);
 
     // Inspect to get mapped port
     let publicPort = 0;
-    if (template.port) {
+    if (internalPort) {
       const data = await container.inspect();
-      const portKey = `${template.port}/tcp`;
+      const portKey = `${internalPort}/tcp`;
       const bindings = data.NetworkSettings.Ports[portKey];
       const logMsg = `Inspecting container ${containerId}: PortKey=${portKey}, Bindings=${JSON.stringify(bindings)}`;
       logger.info(logMsg);
@@ -266,47 +241,72 @@ export default defineConfig({
     return { containerId: container.id, publicPort };
   } catch (error) {
     logger.error('Failed to create/start container:', error);
+    await fs.appendFile('error.log', `[${new Date().toISOString()}] CreateContainer Error: ${error.message}\n${error.stack}\n`);
     throw error;
   }
 }
 
 app.post('/workspace', asyncHandler(async (req, res) => {
-  const { userId, templateId = 'node-hello', language = 'javascript' } = req.body;
+  const { userId, templateId = 'node-hello', language = 'javascript', title, description, cpu, memory, port } = req.body;
+
+  console.log('=== WORKSPACE CREATION START ===');
+  console.log('Request body:', { userId, templateId, language, title });
 
   const workspaceId = uuidv4();
   const workspacePath = path.resolve(process.cwd(), 'workspaces', userId, workspaceId);
+  console.log('Workspace path:', workspacePath);
+  
   await fs.mkdir(workspacePath, { recursive: true });
+  console.log('Directory created successfully');
 
   // Write template files
   const template = templateConfigs[templateId];
+  console.log('Template config:', { id: template?.id, hasFiles: !!template?.files, fileCount: Object.keys(template?.files || {}).length });
+  
   if (template && template.files) {
     for (const [fileName, content] of Object.entries(template.files)) {
       const filePath = path.join(workspacePath, fileName);
       await fs.mkdir(path.dirname(filePath), { recursive: true });
       await fs.writeFile(filePath, content);
+      console.log('File written:', fileName);
     }
   }
 
   let containerId = null;
   let publicPort = 0;
 
-  try {
-    const result = await createContainer(userId, workspaceId, templateId);
-    containerId = result.containerId;
-    publicPort = result.publicPort;
-  } catch (error) {
-    logger.warn('Container creation failed (continuing without container):', error.message);
-    // Continue without container - allows WASM languages to function
-    containerId = null;
-    publicPort = 0;
+  // Only create container if template requires it (has a port or explicitly needs container)
+  const needsContainer = template.port || template.requiresContainer;
+  console.log('Needs container:', needsContainer);
+  
+  if (needsContainer) {
+    try {
+      console.log('Creating container for template:', templateId);
+      const result = await createContainer(userId, workspaceId, templateId, { cpu, memory, port });
+      containerId = result.containerId;
+      publicPort = result.publicPort;
+      console.log('Container created:', { containerId, publicPort });
+    } catch (error) {
+      console.error('Container creation failed:', error.message);
+      logger.warn('Container creation failed (continuing without container):', error.message);
+      // Continue without container - allows WASM languages to function
+      containerId = null;
+      publicPort = 0;
+    }
+  } else {
+    console.log(`Template ${templateId} does not require container, skipping container creation`);
   }
 
   const workspace = new Workspace({
     userId,
     workspaceId,
     templateId,
-    templateName: templateId,
+    templateName: templateId, // This seems redundant or legacy, keeping it
     language,
+    title: title || 'Untitled Workspace',
+    description: description || '',
+    cpu: cpu || 2.0,
+    memory: memory || '2g',
     containerId,
     publicPort,
     workspacePath,

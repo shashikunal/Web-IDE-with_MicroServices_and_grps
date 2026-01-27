@@ -55,11 +55,13 @@ export default function Preview({ url, visible }: PreviewProps) {
     setDisplayUrl(randomDomain);
   }, [randomDomain]);
 
-  // Health check / Logger (Non-blocking)
+  // Health check / Logger (Polling)
   React.useEffect(() => {
     if (!visible) return;
 
     let mounted = true;
+    let attempts = 0;
+    const maxAttempts = 15; // 30 seconds total (2s interval)
 
     const ping = async () => {
       try {
@@ -67,12 +69,33 @@ export default function Preview({ url, visible }: PreviewProps) {
         if (mounted) {
           addLog('success', `Health check passed for ${url}`);
           setConnected(true);
+          setLoading(false);
+          setError(null);
         }
+        return true;
       } catch (err: any) {
         if (mounted) {
-          addLog('info', `Health check (fetch) failed, but iframe may still work. (CORS/Network) - ${err.message}`);
-          // Do NOT set error state here, let the iframe try to load.
+          // Only log significant errors or final failure
+          if (attempts >= maxAttempts) {
+            addLog('error', `Connection failed: ${err.message}`);
+            setError(`Failed to connect to ${url} after multiple attempts.`);
+            setLoading(false);
+          }
         }
+        return false;
+      }
+    };
+
+    const poll = async () => {
+      if (!mounted) return;
+
+      const success = await ping();
+      if (success) return;
+
+      attempts++;
+      if (attempts < maxAttempts) {
+        if (attempts === 1) addLog('info', `Waiting for server at ${url}...`);
+        setTimeout(poll, 2000);
       }
     };
 
@@ -81,8 +104,7 @@ export default function Preview({ url, visible }: PreviewProps) {
     setError(null);
     addLog('info', `Connecting to ${url}...`);
 
-    // Attempt one ping, but don't block
-    ping();
+    poll();
 
     return () => { mounted = false; };
   }, [url, retryCount, visible]);

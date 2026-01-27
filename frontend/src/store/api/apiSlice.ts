@@ -8,6 +8,7 @@ export interface Template {
   icon: string;
   color: string;
   hasPreview: boolean;
+  port?: number;
 }
 
 export interface User {
@@ -103,6 +104,10 @@ export interface Workspace {
   workspaceId: string; // UUID
   templateId: string;
   templateName: string;
+  title: string;
+  description: string;
+  cpu: number;
+  memory: string;
   language: string;
   containerId: string;
   publicPort: number;
@@ -177,6 +182,11 @@ export const apiSlice = createApi({
       language: string;
       templateId: string;
       templateName: string;
+      title?: string;
+      description?: string;
+      cpu?: number;
+      memory?: string;
+      port?: number;
     }>({
       query: (body) => ({
         url: '/workspaces',
@@ -194,7 +204,7 @@ export const apiSlice = createApi({
 
     // Files
     getFiles: builder.query<FileItem[], { userId: string; workspaceId: string; path?: string }>({
-      query: ({ workspaceId, path = '/' }) => `/workspaces/${workspaceId}/files?path=${encodeURIComponent(path)}`,
+      query: ({ workspaceId, path = '.' }) => `/workspaces/${workspaceId}/files?path=${encodeURIComponent(path)}`,
       transformResponse: (response: { files: FileItem[] }) => response.files,
       providesTags: (_result, _error, { workspaceId }) => [
         { type: 'Files', id: workspaceId },

@@ -12,5 +12,5 @@ export default {
   cmd: ['-c', 'tail -f /dev/null'],
   port: 5173,
   setupScript: 'if [ ! -f package.json ]; then npm create vite@latest . -- --template react-ts --yes; fi && npm install',
-  startCommand: 'npm run dev'
+  startCommand: 'npm run dev -- --host'
 };

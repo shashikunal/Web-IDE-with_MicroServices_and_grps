@@ -19,6 +19,22 @@ const workspaceSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  title: {
+    type: String,
+    default: 'Untitled Workspace'
+  },
+  description: {
+    type: String,
+    default: ''
+  },
+  cpu: {
+    type: Number,
+    default: 2.0
+  },
+  memory: {
+    type: String,
+    default: '2g'
+  },
   language: {
     type: String,
     required: true

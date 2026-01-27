@@ -10,6 +10,7 @@ export const LANGUAGES: Template[] = [
     { id: 'ruby-lang', name: 'Ruby', language: 'ruby', description: 'Ruby MRI', icon: '💎', color: 'from-red-600/20 to-red-700/10 border-red-600/30', hasPreview: false },
     { id: 'php-lang', name: 'PHP', language: 'php', description: 'PHP 8.2', icon: '🐘', color: 'from-indigo-400/20 to-indigo-500/10 border-indigo-400/30', hasPreview: true },
     { id: 'java-maven', name: 'Java', language: 'java', description: 'JVM | WASM', icon: '☕', color: 'from-orange-500/20 to-orange-600/10 border-orange-500/30', hasPreview: false },
+    { id: 'csharp-console', name: 'C#', language: 'csharp', description: '.NET Console', icon: 'C#', color: 'from-purple-600/20 to-purple-700/10 border-purple-600/30', hasPreview: false },
 ];
 
 export const FRAMEWORKS: Template[] = [
@@ -22,4 +23,5 @@ export const FRAMEWORKS: Template[] = [
     { id: 'express-app', name: 'Express.js', language: 'javascript', description: 'Node | Express', icon: '🚂', color: 'from-gray-600/20 to-gray-700/10 border-gray-600/30', hasPreview: true },
     { id: 'spring-boot', name: 'Spring Boot', language: 'java', description: 'Spring | JVM', icon: '🍃', color: 'from-green-600/20 to-green-700/10 border-green-600/30', hasPreview: true },
     { id: 'dotnet', name: '.NET Core', language: 'csharp', description: 'ASP.NET | CLR', icon: '🟣', color: 'from-purple-500/20 to-purple-600/10 border-purple-500/30', hasPreview: true },
+    { id: 'blazor-wasm', name: 'Blazor WASM', language: 'csharp', description: 'WebAssembly | .NET', icon: '🕸️', color: 'from-indigo-500/20 to-indigo-600/10 border-indigo-500/30', hasPreview: true },
 ];

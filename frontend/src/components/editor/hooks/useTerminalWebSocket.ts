@@ -67,8 +67,15 @@ export function useTerminalWebSocket({
         if (socketsRef.current.has(terminalId)) return;
         if (!containerId || containerId === 'null') return;
 
+        const host = window.location.hostname;
+        const port = '3000'; // Or from config if available, but usually gateway is 3000
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//localhost:3000/ws?userId=${userId}&termId=${terminalId}&containerId=${containerId}`;
+        // If we are in dev (localhost:5173), we likely want localhost:3000.
+        // If we are in prod, we might want the same host.
+        // Better: Use `ws://${host}:3000` or rely on Vite proxy if configured.
+
+        // Since Vite proxy is configured for /ws -> localhost:3000
+        const wsUrl = `${protocol}//${window.location.host}/ws?userId=${userId}&termId=${terminalId}&containerId=${containerId}`;
         const ws = new WebSocket(wsUrl);
         ws.binaryType = 'arraybuffer';
 

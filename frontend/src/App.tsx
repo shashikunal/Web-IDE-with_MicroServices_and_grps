@@ -34,6 +34,7 @@ interface WorkspaceInfo {
   workspaceId: string;
   containerId: string;
   template: Template;
+  title?: string;
 }
 
 function AppContent() {
@@ -61,6 +62,7 @@ function AppContent() {
     const templateId = searchParams.get('template');
     const workspaceId = searchParams.get('workspaceId');
     const containerId = searchParams.get('containerId');
+    const title = searchParams.get('title');
 
     if (userId && portStr && templateId && workspaceId && containerId) {
       const template = getTemplateById(templateId) || createFallbackTemplate(templateId, 'Restored workspace');
@@ -69,20 +71,21 @@ function AppContent() {
         publicPort: parseInt(portStr, 10),
         workspaceId,
         containerId,
-        template
+        template,
+        title: title || undefined
       };
     }
     return null;
   }, [searchParams]);
 
 
-  const handleTemplateSelect = (template: Template) => {
+  const handleTemplateSelect = (template: Template, config?: any) => {
     if (!isAuthenticated) {
       setShowAuthModal(true);
       return;
     }
     // Just navigate, let derived state handle the rest
-    navigate(`/setup?template=${template.id}`);
+    navigate(`/setup?template=${template.id}`, { state: { config } });
   };
 
   const handleSetupComplete = (userId: string, publicPort: number, workspaceId: string, containerId: string) => {
@@ -90,6 +93,14 @@ function AppContent() {
     // Note: We need to know the current template ID.
     // Since this is called from SetupScreen, selectedTemplate should be active.
     if (selectedTemplate) {
+      // Need config to determine title? It's not in args.
+      // SetupScreen has the config. We might need to pass title back from SetupScreen if we want it here.
+      // Actually SetupScreen navigates? No, App.tsx handles navigation via onComplete.
+      // But wait, SetupScreen just calls onComplete.
+      // The BACKEND returns the workspace object which has the title.
+      // We should ideally fetch the workspace details or pass the title through.
+      // For now, let's just navigate. If title is missing in URL, we can fetch it or just not show it yet.
+      // BETTER: Update onComplete to accept workspace object or title.
       navigate(`/workspace?userId=${userId}&port=${publicPort}&workspaceId=${workspaceId}&containerId=${containerId}&template=${selectedTemplate.id}`);
     }
   };
@@ -100,12 +111,8 @@ function AppContent() {
   };
 
   const handleWorkspaceSelect = async (workspace: Workspace) => {
-    // We navigate first to the workspace URL. 
-    // The ensure-running logic should ideally happen before navigation or as a check.
-    // However, if we want to preserve the "ensure running" logic:
-    // We can do it here, then navigate.
-
     const templateId = workspace.templateId;
+    const title = workspace.title;
 
     try {
       // Ensure container is running before opening workspace
@@ -119,21 +126,22 @@ function AppContent() {
 
       const data = await response.json();
 
-      if (data.success) {
-        navigate(`/workspace?userId=${workspace.userId}&port=${data.publicPort || workspace.publicPort}&workspaceId=${workspace.workspaceId}&containerId=${data.containerId || workspace.containerId}&template=${templateId}`);
-      } else {
+      const targetUrl = `/workspace?userId=${workspace.userId}&port=${data.success ? (data.publicPort || workspace.publicPort) : workspace.publicPort}&workspaceId=${workspace.workspaceId}&containerId=${data.success ? (data.containerId || workspace.containerId) : workspace.containerId}&template=${templateId}${title ? `&title=${encodeURIComponent(title)}` : ''}`;
+
+      if (!data.success) {
         console.error('Failed to ensure container is running:', data.message);
-        navigate(`/workspace?userId=${workspace.userId}&port=${workspace.publicPort}&workspaceId=${workspace.workspaceId}&containerId=${workspace.containerId}&template=${templateId}`);
       }
+      navigate(targetUrl);
+
     } catch (error) {
       console.error('Error ensuring container is running:', error);
-      navigate(`/workspace?userId=${workspace.userId}&port=${workspace.publicPort}&workspaceId=${workspace.workspaceId}&containerId=${workspace.containerId}&template=${templateId}`);
+      const targetUrl = `/workspace?userId=${workspace.userId}&port=${workspace.publicPort}&workspaceId=${workspace.workspaceId}&containerId=${workspace.containerId}&template=${templateId}${title ? `&title=${encodeURIComponent(title)}` : ''}`;
+      navigate(targetUrl);
     }
   };
 
   const handleBackToTemplates = () => {
     navigate('/');
-    // No need to clear state, navigation clears params which clears derived state
   };
 
   const handleShowDashboard = () => {
@@ -188,7 +196,21 @@ function AppContent() {
           selectedTemplate ? (
             <SetupScreen
               template={selectedTemplate}
-              onComplete={handleSetupComplete}
+              onComplete={(userId, publicPort, workspaceId, containerId) => {
+                // We don't have the title here easily unless we change the signature. 
+                // But wait, SetupScreen saves it to DB. 
+                // When we navigate to /workspace, we derived workspaceInfo from URL.
+                // If the URL doesn't have title, it won't show.
+                // We should probably fetch the workspace in VSCodeIDE if title is missing, or
+                // just accept that new workspaces might default to template name until next load.
+                // OR we can pass it via location state.
+                // Let's pass it via URL if possible, or fetch it.
+                // For now, keep it simple.
+                // Actually, let's update SetupScreen to return title too? 
+                // No, let's rely on dashboard selection which has title.
+                // For *brand new* workspaces, users just typed it, so they know it. But showing it is nice.
+                navigate(`/workspace?userId=${userId}&port=${publicPort}&workspaceId=${workspaceId}&containerId=${containerId}&template=${selectedTemplate.id}`);
+              }}
               onError={handleSetupError}
               onBack={handleBackToTemplates}
             />
@@ -205,6 +227,7 @@ function AppContent() {
               workspaceId={workspaceInfo.workspaceId}
               containerId={workspaceInfo.containerId}
               publicPort={workspaceInfo.publicPort}
+              title={workspaceInfo.title}
               setAppState={(state) => {
                 if (state === 'templates') navigate('/');
                 else if (state === 'dashboard') navigate('/dashboard');

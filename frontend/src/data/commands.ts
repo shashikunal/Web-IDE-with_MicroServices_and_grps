@@ -28,4 +28,7 @@ export const COMMANDS: Record<string, string> = {
     'dotnet': 'dotnet run',
     'java-maven': 'mvn compile exec:java -Dexec.mainClass="com.example.App"',
     'spring-boot': 'mvn spring-boot:run',
+    // New additions
+    'csharp-console': 'dotnet run',
+    'blazor-wasm': 'dotnet watch run --urls http://0.0.0.0:5000',
 };
