@@ -7,7 +7,7 @@ export default {
   compiler: 'gcc',
   buildTool: 'make',
   runtime: 'binary',
-  entrypoint: 'sh',
+  entrypoint: ['sh'],
   cmd: ['-c', 'gcc main.c -o main && ./main'],
   port: null,
   files: {

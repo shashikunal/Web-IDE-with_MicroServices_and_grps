@@ -113,6 +113,8 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
   const [showPanel, setShowPanel] = useState(true);
   const [showPreview, setShowPreview] = useState(template.hasPreview);
   const [isExplorerCollapsed, setIsExplorerCollapsed] = useState(false);
+  const [setupProgress, setSetupProgress] = useState(0);
+  const [setupStage, setSetupStage] = useState('Initializing...');
 
   // Editor State
   const [tabs, setTabs] = useState<Tab[]>([]);
@@ -212,7 +214,9 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
     }
     console.log('[VSCodeIDE] ═══════════════════════════════════════');
 
-    const cmd = COMMANDS[template.id];
+    // Use dynamic start command from template if available, otherwise fallback to static map
+    const cmd = template.startCommand || COMMANDS[template.id];
+
     if (cmd && !template.hasPreview) {
       // Clear previous output if desired, or just space a bit
       console.log('[VSCodeIDE] → Sending command to runner terminal:', cmd);
@@ -290,6 +294,151 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
       setFileTree(initialTree);
     }
   }, [initialTree]);
+
+  // Check if we have files (setup complete)
+  // For templates with setup scripts (like React), we wait until files appear.
+  const isSetupComplete = useMemo(() => {
+    // Explicitly check for JS/TS frameworks that need npm install
+    const JS_FRAMEWORKS = ['react-app', 'nextjs', 'angular', 'vue-app'];
+
+    if (JS_FRAMEWORKS.includes(template.id)) {
+      if (!fileTree || !fileTree.children) return false;
+      // Wait for start.sh to be created (which happens after package.json in our templates)
+      return fileTree.children.some(child => child.name === 'start.sh');
+    }
+
+    // For other templates with setupScripts (python/go/etc)
+    // calling cast just in case, but relying on file count
+    const setupScript = (template as any).setupScript;
+    if (setupScript) {
+      if (!fileTree || !fileTree.children) return false;
+      return fileTree.children.length > 0;
+    }
+
+    // Default: true (show IDE immediately for blank/simple templates)
+    return true;
+  }, [fileTree, template, template.id]);
+
+
+  // Setup Progress Simulation
+  useEffect(() => {
+    if (isSetupComplete) {
+      setSetupProgress(100);
+      setSetupStage('Ready');
+      return;
+    }
+
+    if (!fileTree) return;
+
+    // Check for milestones
+    const hasPackageJson = fileTree.children?.some(child => child.name === 'package.json');
+    const hasNodeModules = fileTree.children?.some(child => child.name === 'node_modules');
+    const hasStartSh = fileTree.children?.some(child => child.name === 'start.sh');
+
+    let target = 0;
+
+    if (hasStartSh) {
+      target = 100;
+      setSetupStage('Starting services...');
+    } else if (hasNodeModules) {
+      target = 90;
+      // Don't override stage here immediately if it's already one of the detailed messages
+      // We'll let the interval handle the message cycling
+    } else if (hasPackageJson) {
+      target = 45;
+      setSetupStage('Scaffolding project...');
+    } else {
+      target = 10;
+      setSetupStage('Preparing workspace...');
+    }
+
+    // Smoothly animate to target & cycle messages for long waits
+    const step = () => {
+      setSetupProgress(prev => {
+        // If we are stuck at 90% (installing), cycle messages
+        if (target === 90 && prev >= 89) {
+          const time = Date.now();
+          const msgs = [
+            'Installing dependencies...',
+            'Still installing... fetching packages from registry',
+            'Almost done... linking dependencies',
+            'Finalizing installation...'
+          ];
+          // Change message every 10 seconds based on current time
+          // (Simple hack using modulo of timestamp)
+          const index = Math.floor((time / 10000) % msgs.length);
+          // We can't set state in this sync callback safely without causing render loop if not careful
+          // But actually we are in a setInterval, so it is async.
+          // However, to avoid flickering, let's just do it.
+          setSetupStage(msgs[index]);
+          return 90;
+        }
+
+        if (prev >= target) return prev;
+        // Fast at start, slower as it gets higher
+        const inc = Math.max(0.2, (target - prev) / 20);
+        return Math.min(target, prev + inc);
+      });
+    };
+
+    const interval = setInterval(step, 200);
+    return () => clearInterval(interval);
+
+  }, [fileTree, isSetupComplete]);
+
+  // AUTO-START TERMINAL & POLL SETUP LOGIC
+  const hasAutoStartedRef = useRef(false);
+
+  useEffect(() => {
+    // Only auto-start if connected, haven't started yet, is preview template, and SETUP IS COMPLETE
+    if (isConnected && !hasAutoStartedRef.current && template.hasPreview && isSetupComplete) {
+      if (!terminalsToConnect.some(t => t.id === 'main')) return;
+
+      // Use dynamic start command from template if available, otherwise fallback to static map
+      const cmd = template.startCommand || COMMANDS[template.id];
+      if (!cmd) return;
+
+      const mainTerminal = terminalsToConnect.find(t => t.id === 'main');
+      if (!mainTerminal) return;
+
+      console.log('[VSCodeIDE] Auto-starting dev server in terminal:', cmd);
+
+      // Wait slightly for prompt and UI to be ready
+      // This happens AFTER the loading screen disappears
+      setTimeout(() => {
+        // Kill existing background process first, then start in foreground
+        if (terminalOps?.handleTerminalData) {
+          // Send start command directly
+          setTimeout(() => {
+            terminalOps.handleTerminalData('main', cmd + '\r');
+            toast.success('Dev server starting...');
+          }, 500);
+
+          hasAutoStartedRef.current = true;
+        }
+      }, 1000);
+    }
+  }, [isConnected, template.hasPreview, isSetupComplete, terminalsToConnect, template.id, terminalOps]);
+
+  // Poll for file changes every 5s for the first 2 minutes (to detect when setup finishes)
+  useEffect(() => {
+    let attempts = 0;
+    const maxAttempts = 180; // 15 minutes to be safe during npm install
+
+    // Only poll if valid workspace/user
+    if (!userId || !workspaceId) return;
+
+    const interval = setInterval(() => {
+      if (attempts < maxAttempts) {
+        refetchFileTree();
+        attempts++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [refetchFileTree, userId, workspaceId]);
 
 
 
@@ -430,7 +579,7 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
           try {
             await copyFile({ userId, workspaceId, sourcePath: clipboard.path, destinationPath: destPath || '' }).unwrap();
             toast.success('Pasted successfully');
-            refetchFileTree();
+            setTimeout(() => refetchFileTree(), 1000);
           } catch {
             toast.error('Failed to paste');
           }
@@ -449,7 +598,7 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
     try {
       await moveFile({ userId, workspaceId, sourcePath: src, destinationPath: dest }).unwrap();
       toast.success('Moved successfully');
-      refetchFileTree();
+      setTimeout(() => refetchFileTree(), 1000);
     } catch (err: unknown) {
       const error = err as { data?: { error?: string } };
       toast.error(error?.data?.error || 'Failed to move file');
@@ -477,6 +626,7 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
         await createFileMutation({ userId, workspaceId, path: fullPath, content: '' }).unwrap();
         toast.success(`Created: ${name}`);
         addItemToTree(parentPath, newItem, false);
+        setTimeout(() => refetchFileTree(), 1000);
       } catch {
         toast.error('Failed to create file');
       }
@@ -485,6 +635,7 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
         await createDirectory({ userId, workspaceId, path: fullPath }).unwrap();
         toast.success(`Created folder: ${name}`);
         addItemToTree(parentPath, newItem, false);
+        setTimeout(() => refetchFileTree(), 1000);
       } catch {
         toast.error('Failed to create folder');
       }
@@ -500,7 +651,7 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
     try {
       await moveFile({ userId, workspaceId, sourcePath: renamePath, destinationPath: newPath }).unwrap();
       toast.success('Renamed successfully');
-      refetchFileTree();
+      setTimeout(() => refetchFileTree(), 1000);
     } catch (err: unknown) {
       const error = err as { data?: { message?: string, error?: string } };
       console.error('Rename failed:', error);
@@ -515,7 +666,7 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
       await deleteFile({ userId, workspaceId, path: deleteData.path }).unwrap();
       toast.success('Deleted successfully');
       deleteItemFromTree(deleteData.path);
-      refetchFileTree();
+      setTimeout(() => refetchFileTree(), 1000);
 
       const openTab = tabs.find(t => t.path === deleteData.path);
       if (openTab) {
@@ -818,6 +969,49 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
     />
   ), [terminals, activeTerminalId, showPanel, switchTerminal, closeTerminal, addTerminal, terminalOps.handleTerminalData, terminalOps.handleTerminalResize, terminalOps.handleTerminalReady, lastTerminalRefresh, terminalOps.terminalHistoryRef]);
 
+  // If setup is not complete, show full page loader
+  // Render setup loader if needed
+  if (template.hasPreview && !isSetupComplete) {
+    return (
+      <div className="flex flex-col h-screen w-screen bg-[#1e1e1e] text-white items-center justify-center font-sans">
+        <div className="flex flex-col items-center gap-6 p-10 bg-[#252526] rounded-xl shadow-2xl border border-[#333] max-w-md w-full">
+          <div className="relative">
+            <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full animate-pulse" />
+            <RefreshCw size={48} className="animate-spin text-[#007acc] relative z-10" />
+            <div className="absolute inset-0 flex items-center justify-center z-20">
+              <span className="text-[10px] font-bold text-white/50">{Math.round(setupProgress)}%</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center gap-2 text-center w-full">
+            <h2 className="text-xl font-semibold text-white">Setting up Workspace</h2>
+            <p className="text-[#858585]">{setupStage}</p>
+
+            <div className="flex flex-col gap-2 mt-4 w-full">
+              <div className="flex justify-between text-xs text-[#cccccc]">
+                <span>Progress</span>
+                <span>{Math.round(setupProgress)}%</span>
+              </div>
+
+              <div className="w-full h-2 bg-[#333] rounded-full overflow-hidden border border-[#444]">
+                <div
+                  className="h-full bg-gradient-to-r from-[#007acc] to-[#00aaff] transition-all duration-300 ease-out"
+                  style={{ width: `${setupProgress}%` }}
+                ></div>
+              </div>
+
+              <p className="text-[10px] text-[#666] mt-1 italic">
+                {setupProgress < 40 ? 'Creating container and files...' :
+                  setupProgress < 90 ? 'Installing NPM dependencies (heavy step)...' :
+                    'Finalizing configuration...'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen w-screen flex flex-col bg-[#1e1e1e] text-[#cccccc] overflow-hidden font-sans">
 
@@ -1056,6 +1250,11 @@ export default function VSCodeIDE({ template, userId, workspaceId, containerId, 
       <StatusBar
         currentTab={currentTab}
         isConnected={isConnected}
+        showPanel={showPanel}
+        showPreview={showPreview}
+        onTogglePanel={() => setShowPanel(prev => !prev)}
+        onTogglePreview={() => setShowPreview(prev => !prev)}
+        hasPreview={template.hasPreview}
       />
 
       {/* Context Menu */}

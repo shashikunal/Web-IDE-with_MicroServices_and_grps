@@ -173,7 +173,7 @@ function AppContent() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#1e1e1e' }}>
+    <div className="fixed inset-0 overflow-hidden bg-[#1e1e1e] flex flex-col">
       <Routes>
         <Route path="/" element={
           <TemplateSelection

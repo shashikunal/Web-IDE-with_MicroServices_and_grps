@@ -51,23 +51,42 @@ router.get('/:workspaceId', asyncHandler(async (req, res) => {
 router.post('/', asyncHandler(async (req, res) => {
   await redisClient.delete(`workspaces:${req.user.userId}:list`);
 
-  const response = await fetch(`${workspaceServiceUrl}/workspace`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId: req.user.userId, ...req.body })
-  });
+  // Create container can take time (pulling images, npm install, etc.)
+  // Set a 5-minute timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
 
-  const data = await response.json();
-
-  if (data.success) {
-    await rabbitMQClient.publishWorkspaceEvent('workspace.created', {
-      workspaceId: data.workspace.id,
-      userId: req.user.userId,
-      templateId: data.workspace.templateId
+  try {
+    const response = await fetch(`${workspaceServiceUrl}/workspace`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: req.user.userId, ...req.body }),
+      signal: controller.signal
     });
-  }
 
-  res.status(response.status).json(data);
+    clearTimeout(timeoutId);
+
+    const data = await response.json();
+
+    if (data.success) {
+      await rabbitMQClient.publishWorkspaceEvent('workspace.created', {
+        workspaceId: data.workspace.id,
+        userId: req.user.userId,
+        templateId: data.workspace.templateId
+      });
+    }
+
+    res.status(response.status).json(data);
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      return res.status(504).json({
+        success: false,
+        message: 'Container creation timed out. This can happen when pulling large images or installing dependencies. Please try again.'
+      });
+    }
+    throw error;
+  }
 }));
 
 router.delete('/:workspaceId', asyncHandler(async (req, res) => {
@@ -125,7 +144,7 @@ router.post('/:workspaceId/start', asyncHandler(async (req, res) => {
 
 router.post('/:workspaceId/ensure-running', asyncHandler(async (req, res) => {
   const { workspaceId } = req.params;
-  
+
   const response = await fetch(`${workspaceServiceUrl}/workspace/${workspaceId}/ensure-running`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -133,13 +152,13 @@ router.post('/:workspaceId/ensure-running', asyncHandler(async (req, res) => {
   });
 
   const data = await response.json();
-  
+
   // If container was started/created, invalidate cache
   if (data.success) {
     await redisClient.delete(`workspaces:${req.user.userId}:list`);
     await redisClient.deletePattern(`workspace:${req.user.userId}:${workspaceId}:*`);
   }
-  
+
   res.status(response.status).json(data);
 }));
 

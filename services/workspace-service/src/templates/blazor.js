@@ -7,7 +7,7 @@ export default {
   compiler: 'dotnet build',
   buildTool: 'dotnet',
   runtime: 'WebAssembly',
-  entrypoint: 'sh',
+  entrypoint: ['sh'],
   cmd: ['-c', 'tail -f /dev/null'],
   port: 5000,
   files: {},

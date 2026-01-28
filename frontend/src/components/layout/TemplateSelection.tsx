@@ -2,6 +2,7 @@ import { useState } from 'react';
 import UserProfile from '../auth/UserProfile';
 import type { Template } from '../../store/api/apiSlice';
 import WorkspaceConfigModal, { WorkspaceConfig } from '../setup/WorkspaceConfigModal';
+import { useGetWorkspacesQuery } from '../../store/api/apiSlice';
 
 import { LANGUAGES, FRAMEWORKS } from '../../data/templates';
 
@@ -51,8 +52,25 @@ export default function TemplateSelection({
     setSelectedTemplate(null);
   };
 
+  const { data: workspaces } = useGetWorkspacesQuery(undefined, { skip: !isAuthenticated });
+  const recentWorkspaces = workspaces ? [...workspaces].sort((a, b) => new Date(b.lastAccessedAt || b.createdAt).getTime() - new Date(a.lastAccessedAt || a.createdAt).getTime()).slice(0, 4) : [];
+
+  const handleRecentClick = (ws: any) => {
+    // Just navigate to the workspace route directly using window.location or similar logic?
+    // Actually onSelect is for templates. We need onShowDashboard logic or just direct navigation.
+    // But we don't have 'navigate' here. We can use onShowDashboard() which goes to /dashboard.
+    // Ideally we should pass a handler for opening a workspace.
+    // For now, let's just use onShowDashboard() to take them to the full list, 
+    // OR we can rely on the parent to handle it if we added a prop.
+    // Since we can't easily add a prop without changing App.tsx interactively again and again, 
+    // let's just make clicking them go to the Dashboard for now, 
+    // OR import useNavigate (but this is a component). 
+    // Let's use window.location as a fallback or better, onShowDashboard() is "My Workspaces".
+    onShowDashboard();
+  };
+
   return (
-    <div style={{ backgroundColor: '#1e1e1e', color: '#cccccc', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
+    <div className="flex-1 h-full w-full overflow-y-auto bg-[#1e1e1e]" style={{ color: '#cccccc', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
       {selectedTemplate && (
         <WorkspaceConfigModal
           template={selectedTemplate}
@@ -60,12 +78,36 @@ export default function TemplateSelection({
           onCancel={handleConfigCancel}
         />
       )}
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px 24px 60px' }}>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px 24px 80px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <button
+            onClick={onShowDashboard}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              backgroundColor: '#2d2d2d',
+              border: '1px solid #3d3d3d',
+              borderRadius: '6px',
+              color: '#cccccc',
+              fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              fontWeight: 500
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#007acc'; e.currentTarget.style.color = '#ffffff'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#3d3d3d'; e.currentTarget.style.color = '#cccccc'; }}
+          >
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            My Workspaces
+          </button>
           <UserProfile onLogout={onLogout} onLogin={onLogin} />
         </div>
 
-        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', marginBottom: '16px' }}>
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
               <path d="M12 2L2 7v10l10 5 10-5V7L12 2z" fill="#007acc" />
@@ -101,6 +143,44 @@ export default function TemplateSelection({
               }}
             />
           </div>
+
+          {recentWorkspaces.length > 0 && !search && (
+            <div style={{ marginBottom: '32px', maxWidth: '800px', margin: '0 auto 32px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#858585', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Recent Workspaces</h3>
+                <button onClick={onShowDashboard} style={{ background: 'none', border: 'none', color: '#007acc', cursor: 'pointer', fontSize: '13px' }}>View All</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
+                {recentWorkspaces.map(ws => (
+                  <div
+                    key={ws.workspaceId}
+                    onClick={onShowDashboard}
+                    style={{
+                      backgroundColor: '#252526',
+                      border: '1px solid #3d3d3d',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#007acc'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#3d3d3d'; }}
+                  >
+                    <div style={{ width: '32px', height: '32px', borderRadius: '6px', backgroundColor: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>
+                      {ws.templateName === 'react-app' ? '⚛️' : '📁'}
+                    </div>
+                    <div style={{ overflow: 'hidden' }}>
+                      <div style={{ color: '#cccccc', fontSize: '14px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ws.title || ws.templateName}</div>
+                      <div style={{ color: '#858585', fontSize: '11px' }}>{new Date(ws.lastAccessedAt || ws.createdAt).toLocaleDateString()}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
             <button

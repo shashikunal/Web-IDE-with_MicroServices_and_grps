@@ -7,7 +7,7 @@ export default {
   compiler: 'dotnet',
   interpreter: 'dotnet',
   runtime: 'dotnet',
-  entrypoint: 'sh',
+  entrypoint: ['sh'],
   cmd: ['-c', 'tail -f /dev/null'],
   port: null,
   requiresContainer: true, // Enable container for code execution

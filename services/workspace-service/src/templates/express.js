@@ -7,7 +7,7 @@ export default {
   compiler: null,
   interpreter: 'node',
   runtime: 'node',
-  entrypoint: 'sh',
+  entrypoint: ['sh'],
   cmd: ['-c', 'npm install && npm start'],
   port: 3000,
   startCommand: 'npm start',

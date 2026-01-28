@@ -7,7 +7,7 @@ export default {
   compiler: 'rustc',
   buildTool: 'cargo',
   runtime: 'binary',
-  entrypoint: 'sh',
+  entrypoint: ['sh'],
   cmd: ['-c', 'rustc main.rs && ./main'],
   port: null,
   files: {

@@ -7,7 +7,7 @@ export default {
   compiler: 'g++',
   buildTool: 'make',
   runtime: 'binary',
-  entrypoint: 'sh',
+  entrypoint: ['sh'],
   cmd: ['-c', 'g++ -o main main.cpp && ./main'],
   port: null,
   files: {

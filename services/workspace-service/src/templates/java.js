@@ -7,7 +7,7 @@ export default {
   compiler: 'javac',
   buildTool: 'maven',
   runtime: 'jvm',
-  entrypoint: 'sh',
+  entrypoint: ['sh'],
   cmd: ['-c', 'tail -f /dev/null'],
   // port: 8080, // Console app doesn't need a port mapping
   files: {

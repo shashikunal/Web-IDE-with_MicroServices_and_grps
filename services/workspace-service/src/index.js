@@ -35,83 +35,84 @@ import templateConfigs from './templates/index.js';
 
 // Helper to parse memory string (e.g., "512m", "2g") to bytes
 function parseMemory(memStr) {
-    if (!memStr) return 0;
-    const match = memStr.toString().match(/^(\d+)([gGmMkK]?)$/);
-    if (!match) return 0;
-    const val = parseInt(match[1], 10);
-    const unit = match[2].toLowerCase();
-    switch (unit) {
-        case 'g': return val * 1024 * 1024 * 1024;
-        case 'm': return val * 1024 * 1024;
-        case 'k': return val * 1024;
-        default: return val;
-    }
+  if (!memStr) return 0;
+  const match = memStr.toString().match(/^(\d+)([gGmMkK]?)$/);
+  if (!match) return 0;
+  const val = parseInt(match[1], 10);
+  const unit = match[2].toLowerCase();
+  switch (unit) {
+    case 'g': return val * 1024 * 1024 * 1024;
+    case 'm': return val * 1024 * 1024;
+    case 'k': return val * 1024;
+    default: return val;
+  }
 }
 
-async function ensureApplicationRunning(container, templateId, force = false) {
+async function ensureApplicationRunning(container, templateId, publicPort, force = false) {
   const template = templateConfigs[templateId];
   if (!template || !template.startCommand) return;
 
   try {
     if (!force) {
-        // Check if process is already running to avoid duplicates
-        // Using a simple check with ps aux. 
-        const execCheck = await container.exec({
-          Cmd: ['sh', '-c', 'ps aux'],
-          AttachStdout: true,
-          AttachStderr: false
-        });
-        
-        const stream = await execCheck.start({});
-        let output = '';
-        
-        await new Promise((resolve, reject) => {
-            stream.on('data', chunk => output += chunk.toString());
-            stream.on('end', resolve);
-            stream.on('error', reject);
-        });
+      // Check if process is already running to avoid duplicates
+      // Using a simple check with ps aux. 
+      const execCheck = await container.exec({
+        Cmd: ['sh', '-c', 'ps aux'],
+        AttachStdout: true,
+        AttachStderr: false
+      });
 
-        // Debug output
-        // console.log(`[Container] ps aux output: ${output}`);
+      const stream = await execCheck.start({});
+      let output = '';
 
-        // Simple heuristic: check if the command string is present in ps output
-        // "npm run" is too generic and might match artifacts.
-        // We check for the specific command or common framework binaries
-        if (output.includes(template.startCommand)) {
-           console.log(`[Container] Application '${template.startCommand}' appears to be running.`);
-           return;
-        }
-        
-        // Specific checks for frameworks to detect actual running servers
-        if (templateId === 'nextjs' && output.includes('next-server')) {
-             console.log(`[Container] Next.js server appears to be running.`);
-             return;
-        }
-        if (templateId === 'react-app' && output.includes('vite')) {
-             console.log(`[Container] Vite server appears to be running.`);
-             return;
-        }
-        if (templateId === 'angular' && (output.includes('ng serve') || output.includes('angular-cli'))) {
-             console.log(`[Container] Angular server appears to be running.`);
-             return;
-        }
-        if ((templateId === 'express-app' || templateId === 'node-hello') && (output.includes('node') || output.includes('nodemon'))) {
-             console.log(`[Container] Node/Express server appears to be running.`);
-             return;
-        }
+      await new Promise((resolve, reject) => {
+        stream.on('data', chunk => output += chunk.toString());
+        stream.on('end', resolve);
+        stream.on('error', reject);
+      });
 
-        if (templateId === 'django' && (output.includes('manage.py runserver') || output.includes('python manage.py'))) {
-             console.log(`[Container] Django server appears to be running.`);
-             return;
-        }
+      // Debug output
+      // console.log(`[Container] ps aux output: ${output}`);
+
+      // Simple heuristic: check if the command string is present in ps output
+      // "npm run" is too generic and might match artifacts.
+      // We check for the specific command or common framework binaries
+      if (output.includes(template.startCommand)) {
+        console.log(`[Container] Application '${template.startCommand}' appears to be running.`);
+        return;
+      }
+
+      // Specific checks for frameworks to detect actual running servers
+      if (templateId === 'nextjs' && output.includes('next-server')) {
+        console.log(`[Container] Next.js server appears to be running.`);
+        return;
+      }
+      if (templateId === 'react-app' && output.includes('vite')) {
+        console.log(`[Container] Vite server appears to be running.`);
+        return;
+      }
+      if (templateId === 'angular' && (output.includes('ng serve') || output.includes('angular-cli'))) {
+        console.log(`[Container] Angular server appears to be running.`);
+        return;
+      }
+      if ((templateId === 'express-app' || templateId === 'node-hello') && (output.includes('node') || output.includes('nodemon'))) {
+        console.log(`[Container] Node/Express server appears to be running.`);
+        return;
+      }
+
+      if (templateId === 'django' && (output.includes('manage.py runserver') || output.includes('python manage.py'))) {
+        console.log(`[Container] Django server appears to be running.`);
+        return;
+      }
     }
 
-    console.log(`[Container] Starting application with: ${template.startCommand}`);
+    console.log(`[Container] Starting application with: ${template.startCommand}, PublicPort: ${publicPort}`);
     // we use a detached exec so it runs in background
     const execStart = await container.exec({
-        Cmd: ['sh', '-c', `${template.startCommand} > /tmp/app.log 2>&1 &`],
-        AttachStdout: false,
-        AttachStderr: false
+      Cmd: ['sh', '-c', `${template.startCommand} > /tmp/app.log 2>&1 &`],
+      Env: [`WEBIDE_PUBLIC_PORT=${publicPort || 5173}`],
+      AttachStdout: false,
+      AttachStderr: false
     });
     await execStart.start({ Detach: true });
     console.log('[Container] Application server started in background.');
@@ -161,11 +162,13 @@ async function createContainer(userId, workspaceId, templateId, options = {}) {
       Hostname: containerId,
       name: containerId,
       HostConfig: {
-        NanoCpus: cpuLimit * 1000000000, 
+        NanoCpus: cpuLimit * 1000000000,
         Memory: parseMemory(memoryLimit),
         AutoRemove: false,
         // Bind the specific workspace directory so npm install finds package.json
         Binds: [
+          'webide_npm_cache:/root/.npm',        // Shared npm cache
+          'webide_yarn_cache:/usr/local/share/.cache/yarn', // Shared Yarn cache
           (() => {
             let hostPath;
             if (process.env.HOST_WORKSPACES_PATH) {
@@ -177,7 +180,7 @@ async function createContainer(userId, workspaceId, templateId, options = {}) {
             let normalizedPath = hostPath.replace(/\\/g, '/');
             // Ensure drive letter is lowercased (e.g. C:/... -> c:/...) which is sometimes required by Docker Desktop
             if (normalizedPath.match(/^[A-Z]:/)) {
-               normalizedPath = normalizedPath.charAt(0).toLowerCase() + normalizedPath.slice(1);
+              normalizedPath = normalizedPath.charAt(0).toLowerCase() + normalizedPath.slice(1);
             }
             return `${normalizedPath}:/workspace`;
           })()
@@ -187,40 +190,17 @@ async function createContainer(userId, workspaceId, templateId, options = {}) {
       WorkingDir: '/workspace',
       ExposedPorts: internalPort ? {
         [`${internalPort}/tcp`]: {}
+      } : {},
+      // Use anonymous volume for node_modules to avoid slow bind mounts on Windows
+      Volumes: ['nextjs', 'angular', 'react-app', 'vue-app'].includes(templateId) ? {
+        '/workspace/node_modules': {}
       } : {}
     });
 
     await container.start();
     console.log('[Container] Container started successfully');
 
-    // Initialize Project & Install Dependencies
-    const setupScript = template.setupScript;
-
-    if (setupScript) {
-      console.log(`[Container] Running setup for ${templateId}: ${setupScript}`);
-      try {
-        const exec = await container.exec({
-          Cmd: ['sh', '-c', setupScript],
-          AttachStdout: true,
-          AttachStderr: true
-        });
-        const stream = await exec.start({});
-
-        await new Promise((resolve, reject) => {
-          stream.on('end', resolve);
-          stream.on('error', reject);
-          stream.resume();
-        });
-        console.log('[Container] Setup finished.');
-      } catch (err) {
-        console.error('[Container] Setup failed:', err);
-      }
-    }
-  
-    // Start the application server if a start command is defined
-    await ensureApplicationRunning(container, templateId, true);
-
-    // Inspect to get mapped port
+    // Inspect to get mapped port BEFORE setup (so we can pass it)
     let publicPort = 0;
     if (internalPort) {
       const data = await container.inspect();
@@ -237,6 +217,49 @@ async function createContainer(userId, workspaceId, templateId, options = {}) {
     const createdMsg = `Container created: ${containerId}, Public Port: ${publicPort}`;
     logger.info(createdMsg);
     console.log(createdMsg);
+
+
+    // Initialize Project & Install Dependencies (run asynchronously to avoid blocking)
+    const setupScript = template.setupScript;
+
+    if (setupScript) {
+      console.log(`[Container] Running setup for ${templateId}: ${setupScript}`);
+      // Run setup synchronously - await completion so files exist before user enters
+      try {
+        const exec = await container.exec({
+          Cmd: ['sh', '-c', setupScript],
+          Env: [`WEBIDE_PUBLIC_PORT=${publicPort || 5173}`],
+          AttachStdout: true,
+          AttachStderr: true
+        });
+        const stream = await exec.start({});
+
+        await new Promise((resolve, reject) => {
+          stream.on('end', resolve);
+          stream.on('error', reject);
+          // Important: Must consume stream to allow process to complete
+          stream.resume();
+        });
+
+        // Check exit code to ensure setup actually succeeded
+        const inspectData = await exec.inspect();
+        if (inspectData.ExitCode !== 0) {
+          throw new Error(`Setup script failed with exit code ${inspectData.ExitCode}`);
+        }
+
+        console.log('[Container] Setup finished successfully.');
+
+        // Start the application server after setup completes
+        await ensureApplicationRunning(container, templateId, publicPort, true);
+      } catch (err) {
+        console.error('[Container] Setup failed:', err);
+        // Clean up checking log or throwing further if needed
+        throw err;
+      }
+    } else {
+      // If no setup script, start the app immediately
+      await ensureApplicationRunning(container, templateId, publicPort, true);
+    }
 
     return { containerId: container.id, publicPort };
   } catch (error) {
@@ -255,14 +278,14 @@ app.post('/workspace', asyncHandler(async (req, res) => {
   const workspaceId = uuidv4();
   const workspacePath = path.resolve(process.cwd(), 'workspaces', userId, workspaceId);
   console.log('Workspace path:', workspacePath);
-  
+
   await fs.mkdir(workspacePath, { recursive: true });
   console.log('Directory created successfully');
 
   // Write template files
   const template = templateConfigs[templateId];
   console.log('Template config:', { id: template?.id, hasFiles: !!template?.files, fileCount: Object.keys(template?.files || {}).length });
-  
+
   if (template && template.files) {
     for (const [fileName, content] of Object.entries(template.files)) {
       const filePath = path.join(workspacePath, fileName);
@@ -278,7 +301,7 @@ app.post('/workspace', asyncHandler(async (req, res) => {
   // Only create container if template requires it (has a port or explicitly needs container)
   const needsContainer = template.port || template.requiresContainer;
   console.log('Needs container:', needsContainer);
-  
+
   if (needsContainer) {
     try {
       console.log('Creating container for template:', templateId);
@@ -424,25 +447,25 @@ app.post('/workspace/:workspaceId/start', asyncHandler(async (req, res) => {
     try {
       const container = docker.getContainer(workspace.containerId);
       await container.start();
-      await ensureApplicationRunning(container, workspace.templateId);
+      await ensureApplicationRunning(container, workspace.templateId, workspace.publicPort);
       workspace.status = 'running';
       await workspace.save();
     } catch (error) {
       if (error.statusCode === 304) {
-         // Container already started
-        await ensureApplicationRunning(container, workspace.templateId);
+        // Container already started
+        await ensureApplicationRunning(container, workspace.templateId, workspace.publicPort);
         workspace.status = 'running';
         await workspace.save();
       } else if (error.statusCode === 404) {
         // Container might be gone, try to recreate
         try {
-             const result = await createContainer(userId, workspaceId, workspace.templateId);
-             workspace.containerId = result.containerId;
-             workspace.publicPort = result.publicPort;
-             workspace.status = 'running';
-             await workspace.save();
-        } catch(createErr) {
-             throw createErr;
+          const result = await createContainer(userId, workspaceId, workspace.templateId);
+          workspace.containerId = result.containerId;
+          workspace.publicPort = result.publicPort;
+          workspace.status = 'running';
+          await workspace.save();
+        } catch (createErr) {
+          throw createErr;
         }
       } else {
         throw error;
@@ -451,13 +474,13 @@ app.post('/workspace/:workspaceId/start', asyncHandler(async (req, res) => {
   } else {
     // No container ID, create one
     try {
-         const result = await createContainer(userId, workspaceId, workspace.templateId);
-         workspace.containerId = result.containerId;
-         workspace.publicPort = result.publicPort;
-         workspace.status = 'running';
-         await workspace.save();
-    } catch(createErr) {
-         throw createErr;
+      const result = await createContainer(userId, workspaceId, workspace.templateId);
+      workspace.containerId = result.containerId;
+      workspace.publicPort = result.publicPort;
+      workspace.status = 'running';
+      await workspace.save();
+    } catch (createErr) {
+      throw createErr;
     }
   }
 
@@ -489,7 +512,7 @@ app.post('/workspace/:workspaceId/ensure-running', asyncHandler(async (req, res)
         containerId: workspace.containerId,
         publicPort: workspace.publicPort
       });
-    } catch(createErr) {
+    } catch (createErr) {
       logger.error('Failed to create container:', createErr);
       return res.status(500).json({ success: false, message: `Failed to create container: ${createErr.message}` });
     }
@@ -502,11 +525,11 @@ app.post('/workspace/:workspaceId/ensure-running', asyncHandler(async (req, res)
 
     const isRunning = containerInfo.State.Running;
     const isPaused = containerInfo.State.Paused;
-    
+
     // Get the actual port mapping from Docker
     const template = templateConfigs[workspace.templateId];
     let actualPublicPort = workspace.publicPort; // Default to stored value
-    
+
     if (template && template.port) {
       const portKey = `${template.port}/tcp`;
       const bindings = containerInfo.NetworkSettings.Ports[portKey];
@@ -538,7 +561,7 @@ app.post('/workspace/:workspaceId/ensure-running', asyncHandler(async (req, res)
     if (!isRunning) {
       // Start the container
       await container.start();
-      await ensureApplicationRunning(container, workspace.templateId);
+      await ensureApplicationRunning(container, workspace.templateId, workspace.publicPort);
       workspace.status = 'running';
       await workspace.save();
       logger.info(`Container ${workspace.containerId} started`);
@@ -547,22 +570,22 @@ app.post('/workspace/:workspaceId/ensure-running', asyncHandler(async (req, res)
         message: 'Container started',
         status: 'running',
         containerId: workspace.containerId,
-        publicPort: workspace.publicPort 
+        publicPort: workspace.publicPort
       });
     }
-    
+
     // Container is already running - save any port updates
-    await ensureApplicationRunning(container, workspace.templateId);
+    await ensureApplicationRunning(container, workspace.templateId, workspace.publicPort);
     workspace.status = 'running';
     await workspace.save();
-    return res.json({ 
-      success: true, 
-      message: 'Container already running', 
+    return res.json({
+      success: true,
+      message: 'Container already running',
       status: 'running',
       containerId: workspace.containerId,
-      publicPort: workspace.publicPort 
+      publicPort: workspace.publicPort
     });
-    
+
   } catch (error) {
     if (error.statusCode === 404) {
       // Container doesn't exist, create a new one
@@ -573,29 +596,29 @@ app.post('/workspace/:workspaceId/ensure-running', asyncHandler(async (req, res)
         workspace.publicPort = result.publicPort;
         workspace.status = 'running';
         await workspace.save();
-        return res.json({ 
-          success: true, 
-          message: 'Container recreated and started', 
+        return res.json({
+          success: true,
+          message: 'Container recreated and started',
           status: 'running',
           containerId: workspace.containerId,
-          publicPort: workspace.publicPort 
+          publicPort: workspace.publicPort
         });
-      } catch(createErr) {
+      } catch (createErr) {
         logger.error('Failed to recreate container:', createErr);
         return res.status(500).json({ success: false, message: `Failed to recreate container: ${createErr.message}` });
       }
     } else if (error.statusCode === 304) {
       // Container already started
       const container = docker.getContainer(workspace.containerId);
-      await ensureApplicationRunning(container, workspace.templateId);
+      await ensureApplicationRunning(container, workspace.templateId, workspace.publicPort);
       workspace.status = 'running';
       await workspace.save();
-      return res.json({ 
-        success: true, 
-        message: 'Container already running', 
+      return res.json({
+        success: true,
+        message: 'Container already running',
         status: 'running',
         containerId: workspace.containerId,
-        publicPort: workspace.publicPort 
+        publicPort: workspace.publicPort
       });
     } else {
       logger.error('Error checking container status:', error);
@@ -848,7 +871,7 @@ app.post('/workspace/:workspaceId/file/move', asyncHandler(async (req, res) => {
     logger.info(`Attempting to move file from ${sourceFullPath} to ${destFullPath}`);
 
     await fs.mkdir(path.dirname(destFullPath), { recursive: true });
-    
+
     try {
       await fs.rename(sourceFullPath, destFullPath);
     } catch (renameErr) {

@@ -7,7 +7,7 @@ export default {
   // The provided prompt mental model says "python:3.11".
   image: 'python:3.11-alpine', 
   language: 'python',
-  entrypoint: 'sh',
+  entrypoint: ['sh'],
   // Install dependencies if not present, then run
   cmd: ['-c', 'if [ -f requirements.txt ]; then pip install -r requirements.txt; fi && uvicorn main:app --host 0.0.0.0 --port 8000 --reload'],
   port: 8000,

@@ -7,7 +7,7 @@ export default {
   compiler: null,
   interpreter: 'python3',
   runtime: 'python',
-  entrypoint: 'sh',
+  entrypoint: ['sh'],
   cmd: ['-c', 'pip install django && python manage.py runserver 0.0.0.0:8000'],
   port: 8000,
   startCommand: 'python manage.py runserver 0.0.0.0:8000',

@@ -87,7 +87,7 @@ export default function SetupScreen({ template, onComplete, onError, onBack }: S
   }, [template, createContainer, onComplete, onError]);
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#1e1e1e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ height: '100%', backgroundColor: '#1e1e1e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: '400px', padding: '0 24px' }}>
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
           <div style={{ width: '96px', height: '96px', margin: '0 auto 20px', borderRadius: '16px', background: 'linear-gradient(135deg, #007acc, #005a9e)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 32px rgba(0, 122, 204, 0.4)' }}>

@@ -7,7 +7,7 @@ export default {
   compiler: 'javac',
   buildTool: 'maven',
   runtime: 'jvm',
-  entrypoint: 'sh',
+  entrypoint: ['sh'],
   // Use mvn spring-boot:run
   cmd: ['-c', 'mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Dserver.port=8080"'],
   port: 8080,

@@ -3,7 +3,7 @@ export default {
   name: 'Ruby',
   image: 'ruby:latest',
   language: 'ruby',
-  entrypoint: 'sh',
+  entrypoint: ['sh'],
   cmd: ['-c', 'ruby main.rb'],
   port: null,
   files: {

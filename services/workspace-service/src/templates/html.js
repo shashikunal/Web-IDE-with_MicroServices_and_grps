@@ -3,7 +3,7 @@ export default {
   name: 'HTML',
   image: 'nginx:alpine',
   language: 'html',
-  entrypoint: 'sh',
+  entrypoint: ['sh'],
   cmd: ['-c', 'cp -r /workspace/* /usr/share/nginx/html && nginx -g "daemon off;"'],
   port: 80,
   files: {

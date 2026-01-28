@@ -9,6 +9,7 @@ export interface Template {
   color: string;
   hasPreview: boolean;
   port?: number;
+  startCommand?: string;
 }
 
 export interface User {
@@ -237,9 +238,11 @@ export const apiSlice = createApi({
         method: 'POST',
         body: { path, content },
       }),
-      invalidatesTags: (_result, _error, { workspaceId }) => [
-        { type: 'Files', id: workspaceId },
-      ],
+      onQueryStarted: async (_arg, { queryFulfilled }) => {
+        try {
+          await queryFulfilled;
+        } catch { }
+      },
     }),
 
     createFile: builder.mutation<void, { userId: string; workspaceId: string; path: string; content?: string }>({
@@ -248,9 +251,11 @@ export const apiSlice = createApi({
         method: 'POST',
         body: { path, content },
       }),
-      invalidatesTags: (_result, _error, { workspaceId }) => [
-        { type: 'Files', id: workspaceId },
-      ],
+      onQueryStarted: async (_arg, { queryFulfilled }) => {
+        try {
+          await queryFulfilled;
+        } catch { }
+      },
     }),
 
     createDirectory: builder.mutation<void, { userId: string; workspaceId: string; path: string }>({
@@ -259,9 +264,11 @@ export const apiSlice = createApi({
         method: 'POST',
         body: { path },
       }),
-      invalidatesTags: (_result, _error, { workspaceId }) => [
-        { type: 'Files', id: workspaceId },
-      ],
+      onQueryStarted: async (_arg, { queryFulfilled }) => {
+        try {
+          await queryFulfilled;
+        } catch { }
+      },
     }),
 
     deleteFile: builder.mutation<void, { userId: string; workspaceId: string; path: string }>({
@@ -270,9 +277,11 @@ export const apiSlice = createApi({
         method: 'DELETE',
         body: { path }
       }),
-      invalidatesTags: (_result, _error, { workspaceId }) => [
-        { type: 'Files', id: workspaceId },
-      ],
+      onQueryStarted: async (_arg, { queryFulfilled }) => {
+        try {
+          await queryFulfilled;
+        } catch { }
+      },
     }),
 
     moveFile: builder.mutation<void, { userId: string; workspaceId: string; sourcePath: string; destinationPath: string }>({
@@ -281,9 +290,11 @@ export const apiSlice = createApi({
         method: 'POST',
         body: { userId, workspaceId, sourcePath, destinationPath },
       }),
-      invalidatesTags: (_result, _error, { workspaceId }) => [
-        { type: 'Files', id: workspaceId },
-      ],
+      onQueryStarted: async (_arg, { queryFulfilled }) => {
+        try {
+          await queryFulfilled;
+        } catch { }
+      },
     }),
 
     copyFile: builder.mutation<void, { userId: string; workspaceId: string; sourcePath: string; destinationPath: string }>({
@@ -292,9 +303,11 @@ export const apiSlice = createApi({
         method: 'POST',
         body: { userId, workspaceId, sourcePath, destinationPath },
       }),
-      invalidatesTags: (_result, _error, { workspaceId }) => [
-        { type: 'Files', id: workspaceId },
-      ],
+      onQueryStarted: async (_arg, { queryFulfilled }) => {
+        try {
+          await queryFulfilled;
+        } catch { }
+      },
     }),
 
     // Authentication endpoints

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { RefreshCw, ExternalLink, Terminal, Globe, Zap } from 'lucide-react';
 import ApiTestPanel from '../api-test/ApiTestPanel';
 
@@ -26,7 +26,7 @@ export default function Preview({ url, visible }: PreviewProps) {
   };
 
   // Generate a deterministic domain based on the URL/Port
-  React.useEffect(() => {
+  useEffect(() => {
     const adjectives = ['shiny', 'fast', 'dark', 'epic', 'code', 'hyper', 'mega', 'ultra'];
     const nouns = ['app', 'site', 'web', 'dev', 'space', 'craft', 'view', 'port'];
 
@@ -51,17 +51,17 @@ export default function Preview({ url, visible }: PreviewProps) {
     addLog('info', 'Preview environment initialized');
   }, [url]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setDisplayUrl(randomDomain);
   }, [randomDomain]);
 
   // Health check / Logger (Polling)
-  React.useEffect(() => {
+  useEffect(() => {
     if (!visible) return;
 
     let mounted = true;
     let attempts = 0;
-    const maxAttempts = 15; // 30 seconds total (2s interval)
+    const maxAttempts = 150; // 5 minutes total (2s interval)
 
     const ping = async () => {
       try {
@@ -75,10 +75,11 @@ export default function Preview({ url, visible }: PreviewProps) {
         return true;
       } catch (err: any) {
         if (mounted) {
-          // Only log significant errors or final failure
+          // Keep trying silently
           if (attempts >= maxAttempts) {
+            // Only show error after max attempts
             addLog('error', `Connection failed: ${err.message}`);
-            setError(`Failed to connect to ${url} after multiple attempts.`);
+            setError(`Application server is taking longer than expected to start.`);
             setLoading(false);
           }
         }
@@ -94,7 +95,8 @@ export default function Preview({ url, visible }: PreviewProps) {
 
       attempts++;
       if (attempts < maxAttempts) {
-        if (attempts === 1) addLog('info', `Waiting for server at ${url}...`);
+        // Log every 5 attempts (10s) to show it's still trying
+        if (attempts % 5 === 0) addLog('info', `Waiting for server... (${Math.round(attempts * 2)}s elapsed)`);
         setTimeout(poll, 2000);
       }
     };
@@ -128,24 +130,38 @@ export default function Preview({ url, visible }: PreviewProps) {
 
   const handleUrlSubmit = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      // In a real app, this would update the preview URL. 
-      // For now, we just acknowledge the user action.
-      // We could try to parse the path and append it to the actual localhost URL.
       handleRetry();
     }
   };
 
   if (!visible) return null;
 
-  if (!url) {
+  // Show starting screen if loading (waiting for server)
+  if (loading && !error) {
     return (
-      <div className="flex flex-col h-full bg-[#1e1e1e] border-l border-[#2b2b2b] items-center justify-center text-[#858585] text-sm font-mono">
-        <div className="flex flex-col items-center gap-2">
-          <RefreshCw size={20} className="animate-spin text-[#007acc]" />
-          <span>Waiting for application to start...</span>
+      <div className="flex flex-col h-full bg-[#1e1e1e] border-l border-[#2b2b2b] items-center justify-center text-[#858585] text-sm font-mono p-4 text-center">
+        <div className="flex flex-col items-center gap-4 max-w-sm p-8 bg-[#252526] rounded-lg shadow-xl border border-[#333]">
+          <div className="relative">
+            <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full animate-pulse" />
+            <RefreshCw size={40} className="animate-spin text-[#007acc] relative z-10" />
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <h3 className="text-[#cccccc] font-medium text-base">Waiting for Server</h3>
+            <p className="text-xs text-[#858585] leading-relaxed">
+              Starting Development Server... <br />
+              This usually takes 5-10 seconds.
+            </p>
+          </div>
+          <div className="w-full h-1 bg-[#333] rounded-full mt-2 overflow-hidden w-48">
+            <div className="h-full bg-[#007acc] animate-pulse"></div>
+          </div>
         </div>
       </div>
     );
+  }
+
+  if (!url) {
+    return null;
   }
 
   return (
@@ -182,11 +198,6 @@ export default function Preview({ url, visible }: PreviewProps) {
       <div className="flex-1 relative overflow-hidden bg-white">
         {activeTab === 'preview' ? (
           <>
-            {/* <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#1e1e1e] text-[#858585] z-10 pointer-events-none" style={{ opacity: loading ? 1 : 0, transition: 'opacity 0.3s' }}>
-                <RefreshCw size={24} className="animate-spin mb-3 text-[#007acc]" />
-                <span className="text-xs">Connecting...</span>
-            </div> */}
-
             {error ? (
               <div className="flex flex-col items-center justify-center h-full bg-[#1e1e1e] text-[#cccccc] p-6 text-center absolute inset-0 z-20">
                 <div className="text-4xl mb-4">⚠️</div>

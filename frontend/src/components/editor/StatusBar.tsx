@@ -1,4 +1,4 @@
-import { GitBranch, RefreshCw } from 'lucide-react';
+import { GitBranch, RefreshCw, Terminal, Eye, EyeOff, PanelBottom, PanelBottomClose } from 'lucide-react';
 
 interface Tab {
     id: string;
@@ -12,9 +12,14 @@ interface Tab {
 interface StatusBarProps {
     currentTab: Tab | undefined;
     isConnected: boolean;
+    showPanel: boolean;
+    showPreview: boolean;
+    onTogglePanel: () => void;
+    onTogglePreview: () => void;
+    hasPreview: boolean;
 }
 
-export default function StatusBar({ currentTab, isConnected }: StatusBarProps) {
+export default function StatusBar({ currentTab, isConnected, showPanel, showPreview, onTogglePanel, onTogglePreview, hasPreview }: StatusBarProps) {
     const getLanguageDisplay = (language?: string) => {
         const languageMap: Record<string, string> = {
             'typescript': 'TypeScript JSX',
@@ -45,6 +50,28 @@ export default function StatusBar({ currentTab, isConnected }: StatusBarProps) {
             </div>
 
             <div className="flex items-center gap-3">
+                {/* Terminal Toggle */}
+                <button
+                    onClick={onTogglePanel}
+                    className="hover:bg-white/20 px-1.5 py-0.5 rounded cursor-pointer transition-colors flex items-center gap-1.5"
+                    title={showPanel ? "Hide Terminal" : "Show Terminal"}
+                >
+                    {showPanel ? <PanelBottom size={12} /> : <PanelBottomClose size={12} />}
+                    <span className="text-[11px] font-medium">Terminal</span>
+                </button>
+
+                {/* Preview Toggle (only show if template has preview) */}
+                {hasPreview && (
+                    <button
+                        onClick={onTogglePreview}
+                        className="hover:bg-white/20 px-1.5 py-0.5 rounded cursor-pointer transition-colors flex items-center gap-1.5"
+                        title={showPreview ? "Hide Preview" : "Show Preview"}
+                    >
+                        {showPreview ? <Eye size={12} /> : <EyeOff size={12} />}
+                        <span className="text-[11px] font-medium">Preview</span>
+                    </button>
+                )}
+
                 <div className="hover:bg-white/20 px-1 py-0.5 rounded cursor-pointer transition-colors text-[11px]">
                     Ln {currentTab ? 12 : 0}, Col {currentTab ? 45 : 0}
                 </div>

@@ -1,9 +1,9 @@
 export const COMMANDS: Record<string, string> = {
     // JavaScript/TypeScript Frameworks
-    'react-app': 'CHOKIDAR_USEPOLLING=true npm run dev -- --host 0.0.0.0 --port 5173',
+    'react-app': './start.sh',
     'node-hello': 'node index.js', // Changed to run directly for script experience if needed, or npm start
-    'nextjs': 'npm run dev',
-    'angular': 'ng serve --project my-app --host 0.0.0.0 --allowed-hosts=all --poll 2000',
+    'nextjs': './start.sh',
+    'angular': './start.sh',
     'vue-app': 'npm run dev -- --host 0.0.0.0',
 
     // Python Frameworks

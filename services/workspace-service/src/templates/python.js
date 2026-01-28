@@ -7,7 +7,7 @@ export default {
   compiler: null, // Interpreted
   interpreter: 'python3',
   runtime: 'python',
-  entrypoint: 'sh',
+  entrypoint: ['sh'],
   cmd: ['-c', 'tail -f /dev/null'], // Keep container alive for terminal access
   port: null, // No web server - core Python only
   files: {

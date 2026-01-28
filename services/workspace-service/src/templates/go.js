@@ -7,7 +7,7 @@ export default {
   compiler: 'go build',
   buildTool: 'go',
   runtime: 'binary',
-  entrypoint: 'sh',
+  entrypoint: ['sh'],
   cmd: ['-c', 'go mod init app && go run main.go'],
   port: 8080,
   files: {

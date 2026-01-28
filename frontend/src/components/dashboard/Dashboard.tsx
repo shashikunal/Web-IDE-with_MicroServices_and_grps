@@ -114,7 +114,7 @@ export default function Dashboard({ onSelectWorkspace, onBack }: DashboardProps)
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-vs-bg)] text-[var(--color-vs-text)] font-sans">
+    <div className="flex-1 w-full h-full overflow-y-auto bg-[var(--color-vs-bg)] text-[var(--color-vs-text)] font-sans pb-20">
       <div className="w-full max-w-7xl mx-auto px-6 py-10">
         {/* Header */}
         <div className="flex items-center gap-4 mb-10">

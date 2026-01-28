@@ -7,7 +7,7 @@ export default {
   compiler: null,
   interpreter: 'node',
   runtime: 'node',
-  entrypoint: 'sh',
+  entrypoint: ['sh'],
   cmd: ['-c', 'tail -f /dev/null'],
   port: 3000,
   files: {
